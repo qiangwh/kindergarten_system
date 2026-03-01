@@ -1,1 +1,1 @@
-# kindergarten_system
+记录幼儿园收据信息
