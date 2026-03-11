@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kindergarten.system.mapper.AttendanceMapper">
+
+    <select id="selectAttendanceList" resultType="com.kindergarten.system.entity.Attendance">
+        SELECT a.*,
+               s.name AS studentName,
+               c.class_name AS className
+        FROM attendance a
+        LEFT JOIN student s ON a.student_id = s.id
+        LEFT JOIN class_info c ON a.class_id = c.id
+        <where>
+            <if test="query.classId != null">
+                AND a.class_id = #{query.classId}
+            </if>
+            <if test="query.date != null">
+                AND a.attend_date = #{query.date}
+            </if>
+        </where>
+        ORDER BY s.name ASC
+    </select>
+
+    <select id="selectStudentStats" resultType="com.kindergarten.system.dto.AttendanceStudentStatItem">
+        SELECT s.id AS studentId,
+               s.name AS studentName,
+               s.class_id AS classId,
+               c.class_name AS className,
+               IFNULL(SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END), 0) AS presentDays,
+               IFNULL(SUM(CASE WHEN a.status = 'leave' THEN 1 ELSE 0 END), 0) AS leaveDays,
+               IFNULL(SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END), 0) AS absentDays,
+               COUNT(a.id) AS totalDays
+        FROM attendance a
+        LEFT JOIN student s ON a.student_id = s.id
+        LEFT JOIN class_info c ON a.class_id = c.id
+        <where>
+            <if test="classId != null">
+                AND a.class_id = #{classId}
+            </if>
+            <if test="startDate != null">
+                AND a.attend_date &gt;= #{startDate}
+            </if>
+            <if test="endDate != null">
+                AND a.attend_date &lt;= #{endDate}
+            </if>
+        </where>
+        GROUP BY s.id, s.name, s.class_id, c.class_name
+        ORDER BY s.name ASC
+    </select>
+
+    <select id="selectMonthSummary" resultType="com.kindergarten.system.dto.AttendanceMonthStatItem">
+        SELECT #{classId} AS classId,
+               DATE_FORMAT(#{startDate}, '%Y-%m') AS month,
+               IFNULL(SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END), 0) AS presentDays,
+               IFNULL(SUM(CASE WHEN a.status = 'leave' THEN 1 ELSE 0 END), 0) AS leaveDays,
+               IFNULL(SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END), 0) AS absentDays,
+               COUNT(a.id) AS totalDays
+        FROM attendance a
+        <where>
+            <if test="classId != null">
+                AND a.class_id = #{classId}
+            </if>
+            <if test="startDate != null">
+                AND a.attend_date &gt;= #{startDate}
+            </if>
+            <if test="endDate != null">
+                AND a.attend_date &lt;= #{endDate}
+            </if>
+        </where>
+    </select>
+
+    <select id="selectLeaveDates" resultType="string">
+        SELECT a.attend_date
+        FROM attendance a
+        WHERE a.student_id = #{studentId}
+          AND a.status IN ('leave', 'absent')
+          AND a.attend_date &gt;= #{startDate}
+          AND a.attend_date &lt;= #{endDate}
+        ORDER BY a.attend_date
+    </select>
+
+</mapper>

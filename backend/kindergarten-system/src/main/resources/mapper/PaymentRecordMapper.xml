@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kindergarten.system.mapper.PaymentRecordMapper">
+
+    <select id="selectPaymentPage" resultType="com.kindergarten.system.entity.PaymentRecord">
+        SELECT pr.*,
+               s.name AS studentName,
+               s.class_id AS classId,
+               c.class_name AS className,
+               se.semester_name AS semesterName,
+               ft.type_name AS feeTypeName,
+               ft.type_code AS typeCode
+        FROM payment_record pr
+        LEFT JOIN student s ON pr.student_id = s.id
+        LEFT JOIN class_info c ON s.class_id = c.id
+        LEFT JOIN semester se ON pr.semester_id = se.id
+        LEFT JOIN fee_type ft ON pr.fee_type_id = ft.id
+        <where>
+            <if test="query.studentId != null">
+                AND pr.student_id = #{query.studentId}
+            </if>
+            <if test="query.studentName != null and query.studentName != ''">
+                AND s.name LIKE CONCAT('%', #{query.studentName}, '%')
+            </if>
+            <if test="query.classId != null">
+                AND s.class_id = #{query.classId}
+            </if>
+            <if test="query.semesterId != null">
+                AND pr.semester_id = #{query.semesterId}
+            </if>
+            <if test="query.feeTypeId != null">
+                AND pr.fee_type_id = #{query.feeTypeId}
+            </if>
+            <if test="query.payDateFrom != null">
+                AND pr.pay_date &gt;= #{query.payDateFrom}
+            </if>
+            <if test="query.payDateTo != null">
+                AND pr.pay_date &lt;= #{query.payDateTo}
+            </if>
+        </where>
+        ORDER BY pr.id DESC
+    </select>
+
+</mapper>

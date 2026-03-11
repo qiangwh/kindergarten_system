@@ -1,0 +1,30 @@
+spring:
+  datasource:
+    url: jdbc:mysql://gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/kindergarten_db?useSSL=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+    username: 3mcMwRB23dAMJm4.root
+    password: BZ4PAk7qooINOiAE
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+jwt:
+  secret: kindergarten-system-secret-key-2026
+  expiration: 86400000
+
+logging:
+  level:
+    com.kindergarten: DEBUG
+    org.springframework.security: DEBUG
+
+r2:
+  endpoint: https://example.r2.cloudflarestorage.com
+  access-key: ${R2_ACCESS_KEY:demo-access-key}
+  secret-key: ${R2_SECRET_KEY:demo-secret-key}
+  bucket: ${R2_BUCKET:demo-bucket}
+  public-url: ${R2_PUBLIC_URL:https://cdn.example.com}
+  region: auto
+  max-file-size-mb: 10

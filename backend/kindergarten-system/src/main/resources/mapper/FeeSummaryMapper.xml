@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kindergarten.system.mapper.FeeSummaryMapper">
+
+    <select id="selectSemesterTotal" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(pr.amount), 0)
+        FROM payment_record pr
+        WHERE pr.semester_id = #{semesterId}
+    </select>
+
+    <select id="selectSemesterByFeeType" resultType="com.kindergarten.system.dto.FeeTypeSummaryItem">
+        SELECT pr.fee_type_id AS feeTypeId,
+               ft.type_name AS feeTypeName,
+               ft.type_code AS typeCode,
+               COALESCE(SUM(pr.amount), 0) AS amount
+        FROM payment_record pr
+        LEFT JOIN fee_type ft ON pr.fee_type_id = ft.id
+        WHERE pr.semester_id = #{semesterId}
+        GROUP BY pr.fee_type_id, ft.type_name, ft.type_code
+        ORDER BY pr.fee_type_id
+    </select>
+
+    <select id="selectSemesterCompare" resultType="com.kindergarten.system.dto.SemesterFeeCompareItem">
+        SELECT pr.semester_id AS semesterId,
+               se.semester_name AS semesterName,
+               COALESCE(SUM(pr.amount), 0) AS totalAmount
+        FROM payment_record pr
+        LEFT JOIN semester se ON pr.semester_id = se.id
+        WHERE pr.semester_id IN
+        <foreach collection="semesterIds" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+        GROUP BY pr.semester_id, se.semester_name
+        ORDER BY pr.semester_id
+    </select>
+
+    <select id="selectByClass" resultType="com.kindergarten.system.dto.ClassFeeSummaryItem">
+        SELECT c.id AS classId,
+               c.class_name AS className,
+               COALESCE(SUM(pr.amount), 0) AS amount
+        FROM payment_record pr
+        LEFT JOIN student s ON pr.student_id = s.id
+        LEFT JOIN class_info c ON s.class_id = c.id
+        WHERE pr.semester_id = #{semesterId}
+        GROUP BY c.id, c.class_name
+        ORDER BY c.id
+    </select>
+
+    <select id="selectByClassAndFeeType" resultType="com.kindergarten.system.dto.ClassFeeTypeSummaryItem">
+        SELECT c.id AS classId,
+               c.class_name AS className,
+               ft.id AS feeTypeId,
+               ft.type_name AS feeTypeName,
+               ft.type_code AS typeCode,
+               COALESCE(SUM(pr.amount), 0) AS amount
+        FROM payment_record pr
+        LEFT JOIN student s ON pr.student_id = s.id
+        LEFT JOIN class_info c ON s.class_id = c.id
+        LEFT JOIN fee_type ft ON pr.fee_type_id = ft.id
+        WHERE pr.semester_id = #{semesterId}
+        GROUP BY c.id, c.class_name, ft.id, ft.type_name, ft.type_code
+        ORDER BY c.id, ft.id
+    </select>
+
+</mapper>
