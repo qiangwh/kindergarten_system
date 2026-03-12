@@ -19,15 +19,31 @@ CREATE TABLE IF NOT EXISTS sys_user (
   updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) COMMENT='系统用户';
 
--- 2) 班级
-CREATE TABLE IF NOT EXISTS class_info (
+-- 2) 班级类型（小班、中班、大班）
+CREATE TABLE IF NOT EXISTS class_type (
   id           BIGINT PRIMARY KEY AUTO_INCREMENT,
-  class_name   VARCHAR(50) NOT NULL,
-  sort_order   INT NOT NULL DEFAULT 0,
-  status       TINYINT NOT NULL DEFAULT 1,
+  type_name    VARCHAR(50) NOT NULL COMMENT '类型名称：小班、中班、大班',
+  sort_order   INT NOT NULL DEFAULT 0 COMMENT '排序',
+  status       TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1-启用，0-禁用',
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uk_class_name (class_name)
+  UNIQUE KEY uk_class_type_name (type_name)
+) COMMENT='班级类型';
+
+-- 3) 班级（具体班级，如：小班1班、小班2班）
+CREATE TABLE IF NOT EXISTS class_info (
+  id             BIGINT PRIMARY KEY AUTO_INCREMENT,
+  class_type_id  BIGINT NOT NULL COMMENT '班级类型ID',
+  class_name     VARCHAR(50) NOT NULL COMMENT '班级名称：小班1班、中班2班等',
+  grade_year     VARCHAR(10) COMMENT '年级年份：如2026',
+  max_students   INT DEFAULT 30 COMMENT '最大学生数',
+  current_count  INT DEFAULT 0 COMMENT '当前学生数',
+  status         TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1-启用，0-禁用',
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_class_name_year (class_name, grade_year),
+  KEY idx_class_type (class_type_id),
+  CONSTRAINT fk_class_type FOREIGN KEY (class_type_id) REFERENCES class_type(id)
 ) COMMENT='班级';
 
 -- 3) 学期
@@ -56,23 +72,26 @@ CREATE TABLE IF NOT EXISTS fee_type (
   UNIQUE KEY uk_fee_type_code (type_code)
 ) COMMENT='费用类型';
 
--- 5) 学生
+-- 6) 学生
 CREATE TABLE IF NOT EXISTS student (
   id             BIGINT PRIMARY KEY AUTO_INCREMENT,
-  name           VARCHAR(50) NOT NULL,
-  gender         CHAR(1),
-  birthday       DATE,
-  class_id       BIGINT NOT NULL,
-  parent_name    VARCHAR(50),
-  parent_phone   VARCHAR(20),
-  enroll_date    DATE,
-  leave_date     DATE,
-  status         VARCHAR(20) NOT NULL DEFAULT 'active',
-  remark         VARCHAR(500),
+  name           VARCHAR(50) NOT NULL COMMENT '学生姓名',
+  gender         CHAR(1) COMMENT '性别：M-男，F-女',
+  birthday       DATE COMMENT '出生日期',
+  class_id       BIGINT NOT NULL COMMENT '班级ID',
+  student_no     VARCHAR(50) COMMENT '学号',
+  parent_name    VARCHAR(50) COMMENT '家长姓名',
+  parent_phone   VARCHAR(20) COMMENT '家长电话',
+  parent_wechat  VARCHAR(50) COMMENT '家长微信',
+  enroll_date    DATE COMMENT '入园日期',
+  leave_date     DATE COMMENT '离园日期',
+  status         VARCHAR(20) NOT NULL DEFAULT 'active' COMMENT '状态：active-在读，inactive-离园',
+  remark         VARCHAR(500) COMMENT '备注',
   created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_student_class (class_id),
   KEY idx_student_status (status),
+  KEY idx_student_no (student_no),
   CONSTRAINT fk_student_class FOREIGN KEY (class_id) REFERENCES class_info(id)
 ) COMMENT='学生';
 
@@ -83,7 +102,7 @@ CREATE TABLE IF NOT EXISTS payment_record (
   semester_id        BIGINT NOT NULL,
   fee_type_id        BIGINT NOT NULL,
   amount             DECIMAL(10,2) NOT NULL,
-  pay_date           DATE NOT NULL,
+  pay_date           DATE NOT NULL DEFAULT (CURRENT_DATE),
   receipt_no         VARCHAR(100),
   receipt_image_url  VARCHAR(500),
   remark             VARCHAR(500),
@@ -156,9 +175,18 @@ CREATE TABLE IF NOT EXISTS refund_record (
 INSERT INTO sys_user (username, password, real_name, role)
 VALUES ('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EO', '管理员', 'ADMIN');
 
--- 班级
-INSERT INTO class_info (class_name, sort_order) VALUES
+-- 班级类型
+INSERT INTO class_type (type_name, sort_order) VALUES
 ('小班', 1), ('中班', 2), ('大班', 3);
+
+-- 班级（示例数据）
+INSERT INTO class_info (class_type_id, class_name, grade_year, max_students) VALUES
+(1, '小班1班', '2026', 25),
+(1, '小班2班', '2026', 25),
+(2, '中班1班', '2026', 30),
+(2, '中班2班', '2026', 30),
+(3, '大班1班', '2026', 35),
+(3, '大班2班', '2026', 35);
 
 -- 费用类型（推荐 code）
 INSERT INTO fee_type (type_code, type_name, sort_order) VALUES

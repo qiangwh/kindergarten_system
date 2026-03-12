@@ -67,7 +67,8 @@ public class DashboardServiceImpl implements DashboardService {
         List<ClassInfo> classes = classInfoMapper.selectList(
                 new LambdaQueryWrapper<ClassInfo>()
                         .eq(ClassInfo::getStatus, 1)
-                        .orderByAsc(ClassInfo::getSortOrder)
+                        .orderByDesc(ClassInfo::getGradeYear)
+                        .orderByAsc(ClassInfo::getId)
         );
 
         List<ClassStudentCount> classCounts = new ArrayList<>();
