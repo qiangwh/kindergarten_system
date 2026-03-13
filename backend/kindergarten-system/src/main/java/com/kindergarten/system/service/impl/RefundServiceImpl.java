@@ -25,10 +25,12 @@ import com.kindergarten.system.common.result.ResultCode;
 import com.kindergarten.system.dto.RefundCalculateResult;
 import com.kindergarten.system.dto.RefundCalculateResult.LeaveSegment;
 import com.kindergarten.system.dto.RefundCalculateResult.RefundItem;
+import com.kindergarten.system.entity.RefundRecord;
 import com.kindergarten.system.entity.RefundRuleConfig;
 import com.kindergarten.system.entity.Semester;
 import com.kindergarten.system.entity.Student;
 import com.kindergarten.system.mapper.AttendanceMapper;
+import com.kindergarten.system.mapper.RefundRecordMapper;
 import com.kindergarten.system.mapper.RefundRuleConfigMapper;
 import com.kindergarten.system.mapper.SemesterMapper;
 import com.kindergarten.system.mapper.StudentMapper;
@@ -39,6 +41,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -64,25 +67,31 @@ public class RefundServiceImpl implements RefundService {
     /** 退费规则数据访问 */
     private final RefundRuleConfigMapper refundRuleConfigMapper;
 
+    /** 退费记录数据访问 */
+    private final RefundRecordMapper refundRecordMapper;
+
     /**
      * 计算学生某学期的退费金额
      * <p>
      * 计算流程：
      * 1. 验证学生和学期是否存在
-     * 2. 获取学期内的请假日期列表
-     * 3. 识别连续请假区间
-     * 4. 获取适用的退费规则
-     * 5. 计算各区间退费金额
-     * 6. 汇总返回结果
+     * 2. 解析统计日期范围（未传则使用学期起止日期）
+     * 3. 获取范围内的请假日期列表
+     * 4. 识别连续请假区间
+     * 5. 获取适用的退费规则
+     * 6. 计算各区间退费金额
+     * 7. 汇总返回结果
      * </p>
      *
-     * @param studentId  学生ID
+     * @param studentId 学生ID
      * @param semesterId 学期ID
+     * @param startDate 统计开始日期（可选）
+     * @param endDate 统计结束日期（可选）
      * @return 退费计算结果，包含连续请假区间明细和总退费金额
      * @throws BusinessException 学生或学期不存在时抛出
      */
     @Override
-    public RefundCalculateResult calculateRefund(Long studentId, Long semesterId) {
+    public RefundCalculateResult calculateRefund(Long studentId, Long semesterId, String startDate, String endDate) {
         // 1. 验证学生和学期
         Student student = studentMapper.selectById(studentId);
         if (student == null) {
@@ -94,15 +103,22 @@ public class RefundServiceImpl implements RefundService {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
 
-        // 2. 获取学期内的请假日期列表
+        // 2. 获取统计范围内的请假日期列表
+        LocalDate rangeStart = resolveStartDate(semester, startDate);
+        LocalDate rangeEnd = resolveEndDate(semester, endDate);
+
+        if (rangeStart.isAfter(rangeEnd)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR);
+        }
+
         List<String> leaveDateStrs = attendanceMapper.selectLeaveDates(
                 studentId,
-                semester.getStartDate().toString(),
-                semester.getEndDate().toString()
+                rangeStart.toString(),
+                rangeEnd.toString()
         );
 
         if (leaveDateStrs == null || leaveDateStrs.isEmpty()) {
-            return buildEmptyResult(student, semester);
+            return buildEmptyResult(student, semester, rangeStart, rangeEnd);
         }
 
         // 3. 将日期字符串转为 LocalDate 并排序
@@ -114,8 +130,14 @@ public class RefundServiceImpl implements RefundService {
         // 4. 识别连续请假区间
         List<LeaveSegment> segments = identifyLeaveSegments(leaveDates);
 
+        // 4.1 计算请假总天数（按日期范围内的请假记录统计）
+        int totalLeaveDays = leaveDates.size();
+
         // 5. 获取退费规则
         List<RefundRuleConfig> rules = getRefundRules(semesterId);
+        if (rules == null || rules.isEmpty()) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
+        }
 
         // 6. 计算每个区间的退费金额
         BigDecimal totalRefund = BigDecimal.ZERO;
@@ -130,7 +152,10 @@ public class RefundServiceImpl implements RefundService {
         result.setStudentName(student.getName());
         result.setSemesterId(semesterId);
         result.setSemesterName(semester.getSemesterName());
+        result.setStartDate(rangeStart.toString());
+        result.setEndDate(rangeEnd.toString());
         result.setLeaveSegments(segments);
+        result.setTotalLeaveDays(totalLeaveDays);
         result.setTotalRefundAmount(totalRefund.setScale(2, RoundingMode.HALF_UP));
 
         return result;
@@ -155,34 +180,71 @@ public class RefundServiceImpl implements RefundService {
 
         LocalDate segmentStart = sortedDates.get(0);
         LocalDate segmentEnd = sortedDates.get(0);
+        int segmentDays = 1;
 
         for (int i = 1; i < sortedDates.size(); i++) {
             LocalDate currentDate = sortedDates.get(i);
-            LocalDate expectedDate = segmentEnd.plusDays(1);
 
-            if (currentDate.equals(expectedDate)) {
-                // 连续日期，延长当前区间
+            if (isContinuous(segmentEnd, currentDate)) {
+                // 连续日期（含周末间隔），延长当前区间
                 segmentEnd = currentDate;
+                segmentDays++;
             } else {
                 // 不连续，保存当前区间，开始新区间
-                segments.add(createSegment(segmentStart, segmentEnd));
+                segments.add(createSegment(segmentStart, segmentEnd, segmentDays));
                 segmentStart = currentDate;
                 segmentEnd = currentDate;
+                segmentDays = 1;
             }
         }
 
         // 添加最后一个区间
-        segments.add(createSegment(segmentStart, segmentEnd));
+        segments.add(createSegment(segmentStart, segmentEnd, segmentDays));
 
         return segments;
     }
 
-    private LeaveSegment createSegment(LocalDate start, LocalDate end) {
+    private LeaveSegment createSegment(LocalDate start, LocalDate end, int days) {
         LeaveSegment segment = new LeaveSegment();
         segment.setStartDate(start.toString());
         segment.setEndDate(end.toString());
-        segment.setDays((int) ChronoUnit.DAYS.between(start, end) + 1);
+        // 仅统计实际请假天数（不含周末）
+        segment.setDays(days);
         return segment;
+    }
+
+    private boolean isContinuous(LocalDate previousDate, LocalDate currentDate) {
+        long gapDays = ChronoUnit.DAYS.between(previousDate, currentDate);
+        if (gapDays == 1) {
+            return true;
+        }
+
+        if (gapDays > 1 && gapDays <= 3) {
+            // 允许跨周末连续：两次请假日期之间只包含周六/周日
+            for (LocalDate date = previousDate.plusDays(1); date.isBefore(currentDate); date = date.plusDays(1)) {
+                DayOfWeek dayOfWeek = date.getDayOfWeek();
+                if (dayOfWeek != DayOfWeek.SATURDAY && dayOfWeek != DayOfWeek.SUNDAY) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    private LocalDate resolveStartDate(Semester semester, String startDate) {
+        if (startDate == null || startDate.isBlank()) {
+            return semester.getStartDate();
+        }
+        return LocalDate.parse(startDate);
+    }
+
+    private LocalDate resolveEndDate(Semester semester, String endDate) {
+        if (endDate == null || endDate.isBlank()) {
+            return semester.getEndDate();
+        }
+        return LocalDate.parse(endDate);
     }
 
     /**
@@ -220,8 +282,14 @@ public class RefundServiceImpl implements RefundService {
 
         // 查找匹配的规则
         List<RefundRuleConfig> matchedRules = rules.stream()
-                .filter(r -> ruleType.equals(r.getRuleType()) && r.getStatus() == 1)
+                .filter(r -> ruleType.equals(r.getRuleType()) && r.getStatus() != null && r.getStatus() == 1)
                 .collect(Collectors.toList());
+
+        if (matchedRules.isEmpty()) {
+            segment.setRefundItems(refundItems);
+            segment.setSegmentAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+            return;
+        }
 
         for (RefundRuleConfig rule : matchedRules) {
             BigDecimal dailyRate = rule.getDailyRate();
@@ -285,15 +353,143 @@ public class RefundServiceImpl implements RefundService {
     /**
      * 构建空结果（无请假记录）
      */
-    private RefundCalculateResult buildEmptyResult(Student student, Semester semester) {
+    private RefundCalculateResult buildEmptyResult(Student student, Semester semester, LocalDate rangeStart, LocalDate rangeEnd) {
         RefundCalculateResult result = new RefundCalculateResult();
         result.setStudentId(student.getId());
         result.setStudentName(student.getName());
         result.setSemesterId(semester.getId());
         result.setSemesterName(semester.getSemesterName());
+        result.setStartDate(rangeStart.toString());
+        result.setEndDate(rangeEnd.toString());
         result.setLeaveSegments(new ArrayList<>());
+        result.setTotalLeaveDays(0);
         result.setTotalRefundAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
         return result;
+    }
+
+    /**
+     * 计算并保存退费记录
+     * <p>
+     * 计算退费金额后，将结果保存到 refund_record 表
+     * </p>
+     *
+     * @param studentId  学生ID
+     * @param semesterId 学期ID
+     * @return 退费计算结果
+     */
+    @Override
+    public RefundCalculateResult calculateAndSaveRefund(Long studentId, Long semesterId) {
+        // 先计算退费
+        RefundCalculateResult result = calculateRefund(studentId, semesterId, null, null);
+
+        // 查找是否已存在记录
+        RefundRecord existingRecord = refundRecordMapper.selectOne(
+                new LambdaQueryWrapper<RefundRecord>()
+                        .eq(RefundRecord::getStudentId, studentId)
+                        .eq(RefundRecord::getSemesterId, semesterId)
+        );
+
+        // 将退费明细序列化为 JSON
+        String detailJson = serializeRefundDetails(result.getLeaveSegments());
+
+        if (existingRecord != null) {
+            // 更新现有记录
+            existingRecord.setLeaveDaysTotal(result.getTotalLeaveDays());
+            existingRecord.setRefundAmount(result.getTotalRefundAmount());
+            existingRecord.setDetailJson(detailJson);
+            existingRecord.setCalculatedAt(java.time.LocalDateTime.now());
+            refundRecordMapper.updateById(existingRecord);
+        } else {
+            // 创建新记录
+            RefundRecord newRecord = new RefundRecord();
+            newRecord.setStudentId(studentId);
+            newRecord.setSemesterId(semesterId);
+            newRecord.setLeaveDaysTotal(result.getTotalLeaveDays());
+            newRecord.setRefundAmount(result.getTotalRefundAmount());
+            newRecord.setDetailJson(detailJson);
+            newRecord.setCalculatedAt(java.time.LocalDateTime.now());
+            refundRecordMapper.insert(newRecord);
+        }
+
+        return result;
+    }
+
+    /**
+     * 获取已保存的退费记录
+     *
+     * @param studentId  学生ID
+     * @param semesterId 学期ID
+     * @return 退费计算结果（从数据库读取）
+     */
+    @Override
+    public RefundCalculateResult getSavedRefund(Long studentId, Long semesterId) {
+        Student student = studentMapper.selectById(studentId);
+        Semester semester = semesterMapper.selectById(semesterId);
+
+        RefundRecord record = refundRecordMapper.selectOne(
+                new LambdaQueryWrapper<RefundRecord>()
+                        .eq(RefundRecord::getStudentId, studentId)
+                        .eq(RefundRecord::getSemesterId, semesterId)
+        );
+
+        if (record == null) {
+            // 没有保存的记录，返回空结果
+            if (student != null && semester != null) {
+                return buildEmptyResult(student, semester, semester.getStartDate(), semester.getEndDate());
+            }
+            return null;
+        }
+
+        // 从数据库记录构建返回结果
+        RefundCalculateResult result = new RefundCalculateResult();
+        result.setStudentId(studentId);
+        result.setStudentName(student != null ? student.getName() : null);
+        result.setSemesterId(semesterId);
+        result.setSemesterName(semester != null ? semester.getSemesterName() : null);
+        result.setStartDate(semester != null ? semester.getStartDate().toString() : null);
+        result.setEndDate(semester != null ? semester.getEndDate().toString() : null);
+        result.setTotalLeaveDays(record.getLeaveDaysTotal());
+        result.setTotalRefundAmount(record.getRefundAmount());
+
+        // 反序列化明细 JSON
+        if (record.getDetailJson() != null && !record.getDetailJson().isEmpty()) {
+            result.setLeaveSegments(deserializeRefundDetails(record.getDetailJson()));
+        } else {
+            result.setLeaveSegments(new ArrayList<>());
+        }
+
+        return result;
+    }
+
+    /**
+     * 序列化退费明细为 JSON
+     */
+    private String serializeRefundDetails(List<LeaveSegment> segments) {
+        if (segments == null || segments.isEmpty()) {
+            return "[]";
+        }
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            return mapper.writeValueAsString(segments);
+        } catch (Exception e) {
+            log.error("序列化退费明细失败", e);
+            return "[]";
+        }
+    }
+
+    /**
+     * 反序列化退费明细
+     */
+    private List<LeaveSegment> deserializeRefundDetails(String json) {
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.core.type.TypeReference<List<LeaveSegment>> typeRef =
+                    new com.fasterxml.jackson.core.type.TypeReference<>() {};
+            return mapper.readValue(json, typeRef);
+        } catch (Exception e) {
+            log.error("反序列化退费明细失败", e);
+            return new ArrayList<>();
+        }
     }
 
 }

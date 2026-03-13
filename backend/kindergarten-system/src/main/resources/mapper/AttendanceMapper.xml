@@ -12,7 +12,7 @@
         LEFT JOIN student s ON a.student_id = s.id
         LEFT JOIN class_info c ON a.class_id = c.id
         <where>
-            <if test="query.classId != null">
+            <if test="query.classId != null and query.classId &gt; 0">
                 AND a.class_id = #{query.classId}
             </if>
             <if test="query.date != null">
@@ -74,7 +74,7 @@
         SELECT a.attend_date
         FROM attendance a
         WHERE a.student_id = #{studentId}
-          AND a.status IN ('leave', 'absent')
+          AND a.status = 'leave'
           AND a.attend_date &gt;= #{startDate}
           AND a.attend_date &lt;= #{endDate}
         ORDER BY a.attend_date

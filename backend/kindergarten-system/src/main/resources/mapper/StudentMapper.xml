@@ -22,4 +22,22 @@
         ORDER BY s.id DESC
     </select>
 
+    <select id="selectStudentsForExport" resultType="com.kindergarten.system.entity.Student">
+        SELECT s.*, c.class_name AS className
+        FROM student s
+        LEFT JOIN class_info c ON s.class_id = c.id
+        <where>
+            <if test="query.name != null and query.name != ''">
+                AND s.name LIKE CONCAT('%', #{query.name}, '%')
+            </if>
+            <if test="query.classId != null">
+                AND s.class_id = #{query.classId}
+            </if>
+            <if test="query.status != null and query.status != ''">
+                AND s.status = #{query.status}
+            </if>
+        </where>
+        ORDER BY s.id DESC
+    </select>
+
 </mapper>

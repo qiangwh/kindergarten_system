@@ -39,6 +39,9 @@
             <if test="query.payDateTo != null">
                 AND pr.pay_date &lt;= #{query.payDateTo}
             </if>
+            <if test="query.receiptStatus != null">
+                AND pr.receipt_status = #{query.receiptStatus}
+            </if>
         </where>
         ORDER BY pr.id DESC
     </select>

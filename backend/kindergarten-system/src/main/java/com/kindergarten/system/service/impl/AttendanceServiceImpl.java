@@ -17,6 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,12 +36,29 @@ public class AttendanceServiceImpl extends ServiceImpl<AttendanceMapper, Attenda
     @Transactional(rollbackFor = Exception.class)
     public void saveBatchAttendance(AttendanceSaveRequest request) {
         LocalDate attendDate = request.getAttendDate();
-        QueryWrapper<Attendance> wrapper = new QueryWrapper<>();
-        wrapper.eq("class_id", request.getClassId())
-               .eq("attend_date", attendDate);
-        remove(wrapper);
         List<AttendanceSaveItem> items = request.getItems();
-        for (AttendanceSaveItem item : items) {
+        if (items == null || items.isEmpty()) {
+            return;
+        }
+
+        List<Long> studentIds = items.stream()
+                .map(AttendanceSaveItem::getStudentId)
+                .distinct()
+                .toList();
+
+        QueryWrapper<Attendance> wrapper = new QueryWrapper<>();
+        wrapper.eq("attend_date", attendDate)
+               .in("student_id", studentIds);
+        remove(wrapper);
+
+        Map<Long, AttendanceSaveItem> itemMap = items.stream()
+                .collect(Collectors.toMap(
+                        AttendanceSaveItem::getStudentId,
+                        Function.identity(),
+                        (left, right) -> right
+                ));
+
+        for (AttendanceSaveItem item : itemMap.values()) {
             Attendance attendance = new Attendance();
             attendance.setClassId(request.getClassId());
             attendance.setStudentId(item.getStudentId());

@@ -1,5 +1,6 @@
 package com.kindergarten.system.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -9,6 +10,11 @@ import com.kindergarten.system.mapper.PaymentRecordMapper;
 import com.kindergarten.system.service.PaymentRecordService;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
+/**
+ * 缴费记录服务实现类
+ */
 @Service
 public class PaymentRecordServiceImpl extends ServiceImpl<PaymentRecordMapper, PaymentRecord>
         implements PaymentRecordService {
@@ -23,5 +29,15 @@ public class PaymentRecordServiceImpl extends ServiceImpl<PaymentRecordMapper, P
         }
         Page<PaymentRecord> page = new Page<>(query.getPage(), query.getPageSize());
         return baseMapper.selectPaymentPage(page, query);
+    }
+
+    @Override
+    public void batchUpdateReceiptStatus(List<Long> ids, Integer status) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        update(new LambdaUpdateWrapper<PaymentRecord>()
+                .in(PaymentRecord::getId, ids)
+                .set(PaymentRecord::getReceiptStatus, status));
     }
 }

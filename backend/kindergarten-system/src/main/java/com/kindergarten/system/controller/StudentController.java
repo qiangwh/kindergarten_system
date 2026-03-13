@@ -1,28 +1,25 @@
-/**
- * 学生管理控制器
- * <p>
- * 提供学生信息的增删改查接口，包括：
- * - 学生分页查询（支持按姓名、班级、状态筛选）
- * - 学生详情查询
- * - 学生信息新增、修改
- * - 学生状态变更（active/inactive）
- * - 学生删除（软删除）
- * </p>
- *
- * @author Kindergarten System
- * @since 1.0.0
- */
 package com.kindergarten.system.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.kindergarten.system.common.result.PageResult;
 import com.kindergarten.system.common.result.Result;
+import com.kindergarten.system.common.result.ResultCode;
+import com.kindergarten.system.dto.StudentExportQuery;
+import com.kindergarten.system.dto.StudentImportResult;
 import com.kindergarten.system.dto.StudentPageQuery;
 import com.kindergarten.system.entity.Student;
 import com.kindergarten.system.service.StudentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/student")
@@ -77,6 +74,23 @@ public class StudentController {
     public Result<Void> update(@RequestBody @Valid Student student) {
         studentService.updateById(student);
         return Result.success();
+    }
+
+    @GetMapping("/export")
+    public void exportStudents(StudentExportQuery query, HttpServletResponse response) throws IOException {
+        String fileName = URLEncoder.encode("学生信息.xlsx", StandardCharsets.UTF_8.name());
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + fileName);
+        studentService.exportStudents(query, response.getOutputStream());
+    }
+
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<StudentImportResult> importStudents(@RequestPart("file") MultipartFile file) throws IOException {
+        if (file == null || file.isEmpty()) {
+            return Result.failure(ResultCode.PARAM_ERROR, "导入文件不能为空");
+        }
+        StudentImportResult result = studentService.importStudents(file);
+        return Result.success(result);
     }
 
     /**

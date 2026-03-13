@@ -17,10 +17,15 @@ import com.kindergarten.system.dto.RefundCalculateResult;
 import com.kindergarten.system.service.RefundService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 退费计算控制器
+ */
 @RestController
 @RequestMapping("/fee/refund")
 @RequiredArgsConstructor
@@ -30,17 +35,52 @@ public class RefundController {
     private final RefundService refundService;
 
     /**
-     * 计算退费金额
+     * 计算退费金额（仅计算，不保存）
      *
-     * @param studentId  学生ID
+     * @param studentId 学生ID
      * @param semesterId 学期ID
+     * @param startDate 统计开始日期（可选）
+     * @param endDate 统计结束日期（可选）
      * @return 退费计算结果
      */
     @GetMapping("/calculate")
     public Result<RefundCalculateResult> calculate(
             @RequestParam Long studentId,
+            @RequestParam Long semesterId,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
+        return Result.success(refundService.calculateRefund(studentId, semesterId, startDate, endDate));
+    }
+
+    /**
+     * 计算并保存退费记录
+     * <p>
+     * 计算退费金额后，将结果保存到 refund_record 表
+     * </p>
+     *
+     * @param studentId 学生ID
+     * @param semesterId 学期ID
+     * @return 退费计算结果
+     */
+    @PostMapping("/save")
+    public Result<RefundCalculateResult> calculateAndSave(
+            @RequestParam Long studentId,
             @RequestParam Long semesterId) {
-        return Result.success(refundService.calculateRefund(studentId, semesterId));
+        return Result.success(refundService.calculateAndSaveRefund(studentId, semesterId));
+    }
+
+    /**
+     * 获取已保存的退费记录
+     *
+     * @param studentId 学生ID
+     * @param semesterId 学期ID
+     * @return 退费计算结果（从数据库读取）
+     */
+    @GetMapping("/saved")
+    public Result<RefundCalculateResult> getSaved(
+            @RequestParam Long studentId,
+            @RequestParam Long semesterId) {
+        return Result.success(refundService.getSavedRefund(studentId, semesterId));
     }
 
 }

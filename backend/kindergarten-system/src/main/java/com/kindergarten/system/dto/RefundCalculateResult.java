@@ -37,8 +37,17 @@ public class RefundCalculateResult implements Serializable {
     /** 学期名称 */
     private String semesterName;
 
+    /** 统计开始日期 */
+    private String startDate;
+
+    /** 统计结束日期 */
+    private String endDate;
+
     /** 连续请假区间列表 */
     private List<LeaveSegment> leaveSegments;
+
+    /** 请假总天数（剔除双休） */
+    private Integer totalLeaveDays;
 
     /** 总退费金额 */
     private BigDecimal totalRefundAmount;
