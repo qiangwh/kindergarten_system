@@ -387,6 +387,7 @@ public class RefundServiceImpl implements RefundService {
                 new LambdaQueryWrapper<RefundRecord>()
                         .eq(RefundRecord::getStudentId, studentId)
                         .eq(RefundRecord::getSemesterId, semesterId)
+                        .eq(RefundRecord::getRefundType, "LEAVE")
         );
 
         // 将退费明细序列化为 JSON
@@ -430,6 +431,7 @@ public class RefundServiceImpl implements RefundService {
                 new LambdaQueryWrapper<RefundRecord>()
                         .eq(RefundRecord::getStudentId, studentId)
                         .eq(RefundRecord::getSemesterId, semesterId)
+                        .eq(RefundRecord::getRefundType, "LEAVE")
         );
 
         if (record == null) {
@@ -490,6 +492,254 @@ public class RefundServiceImpl implements RefundService {
             log.error("反序列化退费明细失败", e);
             return new ArrayList<>();
         }
+    }
+
+    // ==================== 离园退费相关方法 ====================
+
+    /**
+     * 计算学生学期中途离园退费金额
+     * <p>
+     * 当学生在学期中途离园时，根据实际在园天数计算退费金额。
+     * 计算逻辑：
+     * 1. 获取学生离园日期（student.leave_date）
+     * 2. 计算学期开始到离园日期之间的有效工作日（实际在园天数）
+     * 3. 计算离园日期到学期结束之间的有效工作日（应退天数）
+     * 4. 按日均费用计算退费金额
+     * </p>
+     *
+     * @param studentId  学生ID
+     * @param semesterId 学期ID
+     * @return 离园退费计算结果
+     */
+    @Override
+    public RefundCalculateResult calculateDropoutRefund(Long studentId, Long semesterId) {
+        // 1. 验证学生和学期
+        Student student = studentMapper.selectById(studentId);
+        if (student == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
+        }
+
+        // 验证学生是否已离园
+        if (student.getLeaveDate() == null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "学生未离园，无法计算离园退费");
+        }
+
+        Semester semester = semesterMapper.selectById(semesterId);
+        if (semester == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
+        }
+
+        LocalDate leaveDate = student.getLeaveDate();
+        LocalDate semesterStart = semester.getStartDate();
+        LocalDate semesterEnd = semester.getEndDate();
+
+        // 2. 计算实际在园天数和应退天数
+        int actualAttendDays;
+        int refundDays;
+        
+        // 如果离园日期在学期开始之前，说明学生本学期没有就读，应退全部费用
+        if (leaveDate.isBefore(semesterStart)) {
+            actualAttendDays = 0;
+            refundDays = calculateWorkDays(semesterStart, semesterEnd);
+        }
+        // 如果离园日期在学期结束之后（理论上不应发生），按全学期计算
+        else if (leaveDate.isAfter(semesterEnd)) {
+            actualAttendDays = calculateWorkDays(semesterStart, semesterEnd);
+            refundDays = 0;
+        }
+        // 离园日期在学期内，正常计算
+        else {
+            actualAttendDays = calculateWorkDays(semesterStart, leaveDate.minusDays(1));
+            refundDays = calculateWorkDays(leaveDate, semesterEnd);
+        }
+
+        // 4. 计算学期总工作日
+        int totalWorkDays = calculateWorkDays(semesterStart, semesterEnd);
+
+        // 5. 获取退费规则（使用 LEAVE_10_PLUS 规则的日均费率作为离园退费标准）
+        List<RefundRuleConfig> rules = getDropoutRefundRules(semesterId);
+
+        // 6. 计算退费金额
+        List<RefundItem> refundItems = new ArrayList<>();
+        BigDecimal totalRefund = BigDecimal.ZERO;
+
+        for (RefundRuleConfig rule : rules) {
+            BigDecimal dailyRate = rule.getDailyRate();
+            BigDecimal amount = dailyRate.multiply(BigDecimal.valueOf(refundDays))
+                    .setScale(2, RoundingMode.HALF_UP);
+
+            RefundItem item = new RefundItem();
+            item.setFeeTypeCode(rule.getFeeTypeCode());
+            item.setFeeTypeName(getFeeTypeName(rule.getFeeTypeCode()));
+            item.setDailyRate(dailyRate);
+            item.setAmount(amount);
+            refundItems.add(item);
+
+            totalRefund = totalRefund.add(amount);
+        }
+
+        // 7. 构建返回结果
+        RefundCalculateResult result = new RefundCalculateResult();
+        result.setStudentId(studentId);
+        result.setStudentName(student.getName());
+        result.setSemesterId(semesterId);
+        result.setSemesterName(semester.getSemesterName());
+        result.setStartDate(semesterStart.toString());
+        result.setEndDate(semesterEnd.toString());
+        result.setTotalLeaveDays(refundDays); // 复用字段存储应退天数
+        result.setTotalRefundAmount(totalRefund.setScale(2, RoundingMode.HALF_UP));
+
+        // 构建单个请假区间表示离园退费
+        LeaveSegment segment = new LeaveSegment();
+        segment.setStartDate(leaveDate.toString());
+        segment.setEndDate(semesterEnd.toString());
+        segment.setDays(refundDays);
+        segment.setMatchedRuleType("DROPOUT");
+        segment.setRefundItems(refundItems);
+        segment.setSegmentAmount(totalRefund.setScale(2, RoundingMode.HALF_UP));
+
+        result.setLeaveSegments(List.of(segment));
+
+        return result;
+    }
+
+    /**
+     * 计算并保存离园退费记录
+     */
+    @Override
+    public RefundCalculateResult calculateAndSaveDropoutRefund(Long studentId, Long semesterId) {
+        RefundCalculateResult result = calculateDropoutRefund(studentId, semesterId);
+
+        // 查找是否已存在离园退费记录
+        RefundRecord existingRecord = refundRecordMapper.selectOne(
+                new LambdaQueryWrapper<RefundRecord>()
+                        .eq(RefundRecord::getStudentId, studentId)
+                        .eq(RefundRecord::getSemesterId, semesterId)
+                        .eq(RefundRecord::getRefundType, "LEAVE")
+                        .eq(RefundRecord::getRefundType, "DROPOUT")
+        );
+
+        Student student = studentMapper.selectById(studentId);
+        String detailJson = serializeRefundDetails(result.getLeaveSegments());
+
+        if (existingRecord != null) {
+            existingRecord.setLeaveDaysTotal(null);
+            existingRecord.setActualAttendDays(calculateWorkDays(
+                    semesterMapper.selectById(semesterId).getStartDate(),
+                    student.getLeaveDate().minusDays(1)));
+            existingRecord.setRefundDays(result.getTotalLeaveDays());
+            existingRecord.setLeaveDate(student.getLeaveDate());
+            existingRecord.setRefundAmount(result.getTotalRefundAmount());
+            existingRecord.setDetailJson(detailJson);
+            existingRecord.setCalculatedAt(java.time.LocalDateTime.now());
+            refundRecordMapper.updateById(existingRecord);
+        } else {
+            RefundRecord newRecord = new RefundRecord();
+            newRecord.setStudentId(studentId);
+            newRecord.setSemesterId(semesterId);
+            newRecord.setRefundType("DROPOUT");
+            newRecord.setActualAttendDays(calculateWorkDays(
+                    semesterMapper.selectById(semesterId).getStartDate(),
+                    student.getLeaveDate().minusDays(1)));
+            newRecord.setRefundDays(result.getTotalLeaveDays());
+            newRecord.setLeaveDate(student.getLeaveDate());
+            newRecord.setRefundAmount(result.getTotalRefundAmount());
+            newRecord.setDetailJson(detailJson);
+            newRecord.setCalculatedAt(java.time.LocalDateTime.now());
+            refundRecordMapper.insert(newRecord);
+        }
+
+        return result;
+    }
+
+    /**
+     * 获取已保存的离园退费记录
+     */
+    @Override
+    public RefundCalculateResult getSavedDropoutRefund(Long studentId, Long semesterId) {
+        Student student = studentMapper.selectById(studentId);
+        Semester semester = semesterMapper.selectById(semesterId);
+
+        RefundRecord record = refundRecordMapper.selectOne(
+                new LambdaQueryWrapper<RefundRecord>()
+                        .eq(RefundRecord::getStudentId, studentId)
+                        .eq(RefundRecord::getSemesterId, semesterId)
+                        .eq(RefundRecord::getRefundType, "DROPOUT")
+        );
+
+        if (record == null) {
+            return null;
+        }
+
+        RefundCalculateResult result = new RefundCalculateResult();
+        result.setStudentId(studentId);
+        result.setStudentName(student != null ? student.getName() : null);
+        result.setSemesterId(semesterId);
+        result.setSemesterName(semester != null ? semester.getSemesterName() : null);
+        result.setStartDate(semester != null ? semester.getStartDate().toString() : null);
+        result.setEndDate(semester != null ? semester.getEndDate().toString() : null);
+        result.setTotalLeaveDays(record.getRefundDays());
+        result.setTotalRefundAmount(record.getRefundAmount());
+
+        if (record.getDetailJson() != null && !record.getDetailJson().isEmpty()) {
+            result.setLeaveSegments(deserializeRefundDetails(record.getDetailJson()));
+        } else {
+            result.setLeaveSegments(new ArrayList<>());
+        }
+
+        return result;
+    }
+
+    /**
+     * 计算两个日期之间的工作日天数（不含周末）
+     *
+     * @param start 开始日期
+     * @param end   结束日期
+     * @return 工作日天数
+     */
+    private int calculateWorkDays(LocalDate start, LocalDate end) {
+        if (start.isAfter(end)) {
+            return 0;
+        }
+
+        int workDays = 0;
+        LocalDate current = start;
+        while (!current.isAfter(end)) {
+            DayOfWeek dayOfWeek = current.getDayOfWeek();
+            if (dayOfWeek != DayOfWeek.SATURDAY && dayOfWeek != DayOfWeek.SUNDAY) {
+                workDays++;
+            }
+            current = current.plusDays(1);
+        }
+        return workDays;
+    }
+
+    /**
+     * 获取离园退费规则
+     * <p>
+     * 离园退费使用 LEAVE_10_PLUS 规则的日均费率
+     * </p>
+     */
+    private List<RefundRuleConfig> getDropoutRefundRules(Long semesterId) {
+        // 先查询学期特定规则
+        List<RefundRuleConfig> semesterRules = refundRuleConfigMapper.selectList(
+                new LambdaQueryWrapper<RefundRuleConfig>()
+                        .eq(RefundRuleConfig::getSemesterId, semesterId)
+                        .eq(RefundRuleConfig::getRuleType, "LEAVE_10_PLUS")
+                        .eq(RefundRuleConfig::getStatus, 1)
+        );
+
+        if (!semesterRules.isEmpty()) {
+            return semesterRules;
+        }
+
+        // 回退到全局规则
+        return refundRuleConfigMapper.selectList(
+                new LambdaQueryWrapper<RefundRuleConfig>()
+                        .isNull(RefundRuleConfig::getSemesterId)
+                        .eq(RefundRuleConfig::getRuleType, "LEAVE_10_PLUS")
+                        .eq(RefundRuleConfig::getStatus, 1)
+        );
     }
 
 }

@@ -158,7 +158,11 @@ CREATE TABLE IF NOT EXISTS refund_record (
   id                BIGINT PRIMARY KEY AUTO_INCREMENT,
   student_id        BIGINT NOT NULL,
   semester_id       BIGINT NOT NULL,
-  leave_days_total  INT NOT NULL DEFAULT 0,
+  refund_type       VARCHAR(20) NOT NULL DEFAULT 'LEAVE' COMMENT '退费类型：LEAVE-请假退费，DROPOUT-离园退费',
+  leave_days_total  INT NULL COMMENT '请假总天数（请假退费时使用）',
+  actual_attend_days INT NULL COMMENT '实际在园天数（离园退费时使用）',
+  refund_days       INT NULL COMMENT '应退天数（离园退费时使用）',
+  leave_date        DATE NULL COMMENT '离园日期（离园退费时使用）',
   refund_amount     DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   detail_json       JSON NULL COMMENT '分段明细快照',
   calculated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -166,10 +170,11 @@ CREATE TABLE IF NOT EXISTS refund_record (
   created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_refund_student_semester (student_id, semester_id),
+  KEY idx_refund_type (refund_type),
   CONSTRAINT fk_refund_student FOREIGN KEY (student_id) REFERENCES student(id),
   CONSTRAINT fk_refund_semester FOREIGN KEY (semester_id) REFERENCES semester(id),
   CONSTRAINT fk_refund_user FOREIGN KEY (calculated_by) REFERENCES sys_user(id)
-) COMMENT='退费结果快照（可选）';
+) COMMENT='退费结果快照（支持请假退费和离园退费）';
 
 -- ========= 初始数据 =========
 

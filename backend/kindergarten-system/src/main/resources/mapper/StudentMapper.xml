@@ -40,4 +40,11 @@
         ORDER BY s.id DESC
     </select>
 
+
+    <select id="selectMaxStudentNoSequence" resultType="java.lang.Integer">
+        SELECT MAX(CAST(SUBSTRING_INDEX(student_no, '-', -1) AS UNSIGNED))
+        FROM student
+        WHERE student_no LIKE CONCAT(#{prefix}, '%')
+    </select>
+
 </mapper>

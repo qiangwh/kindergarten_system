@@ -19,7 +19,14 @@ public class FeeDetailQuery {
 
     /** 学生姓名（可选，模糊查询） */
     private String studentName;
-
+    /**
+     * 是否包含离园学生
+     * <p>
+     * 默认 false，仅显示在读学生；
+     * 设为 true 时，同时显示离园学生（用于查看历史缴费和退费记录）
+     * </p>
+     */
+    private Boolean includeInactive = false;
     /** 页码 */
     private Long page = 1L;
 

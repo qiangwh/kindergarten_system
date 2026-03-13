@@ -14,4 +14,11 @@ public interface StudentMapper extends BaseMapper<Student> {
     IPage<Student> selectStudentPage(IPage<Student> page, @Param("query") StudentPageQuery query);
 
     java.util.List<Student> selectStudentsForExport(@Param("query") StudentExportQuery query);
+
+    /**
+     * 查询指定学号前缀的最大序号
+     * @param prefix 学号前缀（如：2024-XB1-）
+     * @return 最大序号（如：001返回1，002返回2）
+     */
+    Integer selectMaxStudentNoSequence(@Param("prefix") String prefix);
 }

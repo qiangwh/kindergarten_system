@@ -14,7 +14,9 @@ import java.time.LocalDateTime;
  * 退费记录实体类
  * <p>
  * 对应数据库表：refund_record
- * 存储退费结果快照
+ * 存储退费结果快照，支持两种退费类型：
+ * - LEAVE：请假退费，基于连续请假天数计算
+ * - DROPOUT：离园退费，基于学期中途离园计算
  * </p>
  *
  * @author Kindergarten System
@@ -31,8 +33,27 @@ public class RefundRecord extends BaseEntity {
     /** 学期ID */
     private Long semesterId;
 
-    /** 请假总天数 */
+    /**
+     * 退费类型
+     * <ul>
+     *   <li>LEAVE - 请假退费：基于连续请假天数计算</li>
+     *   <li>DROPOUT - 离园退费：基于学期中途离园计算</li>
+     * </ul>
+     */
+    private String refundType;
+
+    /** 请假总天数（请假退费时使用） */
     private Integer leaveDaysTotal;
+
+    /** 实际在园天数（离园退费时使用） */
+    private Integer actualAttendDays;
+
+    /** 应退天数（离园退费时使用） */
+    private Integer refundDays;
+
+    /** 离园日期（离园退费时使用） */
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate leaveDate;
 
     /** 退费金额 */
     private BigDecimal refundAmount;

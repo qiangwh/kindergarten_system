@@ -39,11 +39,17 @@ public class Student extends BaseEntity {
     /** 班级ID */
     private Long classId;
 
+    /** 学号 */
+    private String studentNo;
+
     /** 家长姓名 */
     private String parentName;
 
     /** 家长电话 */
     private String parentPhone;
+
+    /** 家长微信 */
+    private String parentWechat;
 
     /** 入园日期 */
     @JsonFormat(pattern = "yyyy-MM-dd")

@@ -31,6 +31,8 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.List;
 
 @Service
@@ -63,6 +65,14 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
         student.setStatus(status);
+        // 如果状态变为离园，且离园日期为空，则设置离园日期为今天
+        if ("inactive".equals(status) && student.getLeaveDate() == null) {
+            student.setLeaveDate(LocalDate.now());
+        }
+        // 如果状态复园（active），清空离园日期
+        if ("active".equals(status)) {
+            student.setLeaveDate(null);
+        }
         updateById(student);
     }
 
@@ -76,9 +86,28 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("学生信息");
             Row header = sheet.createRow(0);
-            String[] titles = {"姓名", "性别", "出生日期", "班级名称", "家长姓名", "家长电话", "入园日期", "离园日期", "状态", "备注"};
+            String[] titles = {"学号", "姓名", "性别", "出生日期", "班级名称", "家长姓名", "家长电话", "入园日期", "离园日期", "状态", "备注"};
             for (int i = 0; i < titles.length; i++) {
                 header.createCell(i).setCellValue(titles[i]);
+            }
+
+            List<Student> students = listStudentsForExport(query);
+            if (students != null && !students.isEmpty()) {
+                int rowIndex = 1;
+                for (Student student : students) {
+                    Row row = sheet.createRow(rowIndex++);
+                    row.createCell(0).setCellValue(nullToEmpty(student.getStudentNo()));
+                    row.createCell(1).setCellValue(nullToEmpty(student.getName()));
+                    row.createCell(2).setCellValue(formatGender(student.getGender()));
+                    row.createCell(3).setCellValue(formatDate(student.getBirthday()));
+                    row.createCell(4).setCellValue(nullToEmpty(student.getClassName()));
+                    row.createCell(5).setCellValue(nullToEmpty(student.getParentName()));
+                    row.createCell(6).setCellValue(nullToEmpty(student.getParentPhone()));
+                    row.createCell(7).setCellValue(formatDate(student.getEnrollDate()));
+                    row.createCell(8).setCellValue(formatDate(student.getLeaveDate()));
+                    row.createCell(9).setCellValue(formatStatus(student.getStatus()));
+                    row.createCell(10).setCellValue(nullToEmpty(student.getRemark()));
+                }
             }
 
             for (int i = 0; i < titles.length; i++) {
@@ -110,14 +139,15 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
                 result.setTotalCount(result.getTotalCount() + 1);
                 try {
                     Student student = new Student();
-                    String name = getStringCellValue(row.getCell(0));
+                    String studentNo = getStringCellValue(row.getCell(0));
+                    String name = getStringCellValue(row.getCell(1));
                     if (name == null || name.isBlank()) {
                         throw new IllegalArgumentException("姓名不能为空");
                     }
                     student.setName(name);
-                    student.setGender(getStringCellValue(row.getCell(1)));
-                    student.setBirthday(getDateCellValue(row.getCell(2)));
-                    String className = getStringCellValue(row.getCell(3));
+                    student.setGender(parseGender(getStringCellValue(row.getCell(2))));
+                    student.setBirthday(getDateCellValue(row.getCell(3)));
+                    String className = getStringCellValue(row.getCell(4));
                     if (className == null || className.isBlank()) {
                         throw new IllegalArgumentException("班级名称不能为空");
                     }
@@ -129,13 +159,19 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
                         throw new IllegalArgumentException("班级名称不存在：" + className);
                     }
                     student.setClassId(classInfo.getId());
-                    student.setParentName(getStringCellValue(row.getCell(4)));
-                    student.setParentPhone(getStringCellValue(row.getCell(5)));
-                    student.setEnrollDate(getDateCellValue(row.getCell(6)));
-                    student.setLeaveDate(getDateCellValue(row.getCell(7)));
-                    String status = getStringCellValue(row.getCell(8));
-                    student.setStatus((status == null || status.isBlank()) ? "active" : status);
-                    student.setRemark(getStringCellValue(row.getCell(9)));
+                    student.setParentName(getStringCellValue(row.getCell(5)));
+                    student.setParentPhone(getStringCellValue(row.getCell(6)));
+                    student.setEnrollDate(getDateCellValue(row.getCell(7)));
+                    student.setLeaveDate(getDateCellValue(row.getCell(8)));
+                    String status = getStringCellValue(row.getCell(9));
+                    student.setStatus(parseStatus(status));
+                    student.setRemark(getStringCellValue(row.getCell(10)));
+                    
+                    // 如果学号为空，自动生成学号
+                    if (studentNo == null || studentNo.isBlank()) {
+                        studentNo = generateStudentNo(classInfo, student.getEnrollDate());
+                    }
+                    student.setStudentNo(studentNo);
 
                     students.add(student);
                     result.setSuccessCount(result.getSuccessCount() + 1);
@@ -176,8 +212,15 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
             }
             return String.valueOf(numericValue);
         }
-        cell.setCellType(CellType.STRING);
-        String value = cell.getStringCellValue();
+        // 使用DataFormatter来获取单元格字符串值，避免弃用方法
+        String value;
+        if (cell.getCellType() == CellType.STRING) {
+            value = cell.getStringCellValue();
+        } else {
+            // 对于其他类型，使用DataFormatter格式化
+            org.apache.poi.ss.usermodel.DataFormatter formatter = new org.apache.poi.ss.usermodel.DataFormatter();
+            value = formatter.formatCellValue(cell);
+        }
         return value == null ? null : value.trim();
     }
 
@@ -193,5 +236,123 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
             return null;
         }
         return LocalDate.parse(value, DATE_FORMATTER);
+    }
+
+    private String formatGender(String gender) {
+        if (gender == null) {
+            return "";
+        }
+        if ("M".equals(gender)) {
+            return "男";
+        }
+        if ("F".equals(gender)) {
+            return "女";
+        }
+        return gender;
+    }
+
+    private String formatStatus(String status) {
+        if (status == null) {
+            return "";
+        }
+        if ("active".equals(status)) {
+            return "在读";
+        }
+        if ("inactive".equals(status)) {
+            return "离园";
+        }
+        return status;
+    }
+
+    private String parseGender(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = value.trim().toUpperCase();
+        if ("男".equals(value) || "M".equals(normalized)) {
+            return "M";
+        }
+        if ("女".equals(value) || "F".equals(normalized)) {
+            return "F";
+        }
+        return null;
+    }
+
+    private String parseStatus(String value) {
+        if (value == null || value.isBlank()) {
+            return "active";
+        }
+        String normalized = value.trim().toLowerCase();
+        if ("在读".equals(value) || "active".equals(normalized)) {
+            return "active";
+        }
+        if ("离园".equals(value) || "inactive".equals(normalized)) {
+            return "inactive";
+        }
+        return "active";
+    }
+
+    /**
+     * 生成学号
+     * 格式：入园年份-班级代码-序号（如：2024-XB1-001）
+     */
+    private String generateStudentNo(ClassInfo classInfo, LocalDate enrollDate) {
+        // 获取入园年份
+        int year;
+        if (enrollDate != null) {
+            year = enrollDate.getYear();
+        } else {
+            year = LocalDate.now().getYear();
+        }
+        
+        // 从班级名称提取班级代码
+        String classCode = extractClassCode(classInfo.getClassName());
+        
+        // 查询该班级当前最大序号
+        String prefix = year + "-" + classCode + "-";
+        Integer maxSeq = baseMapper.selectMaxStudentNoSequence(prefix);
+        int nextSeq = (maxSeq != null ? maxSeq : 0) + 1;
+        
+        return String.format("%d-%s-%03d", year, classCode, nextSeq);
+    }
+    
+    /**
+     * 从班级名称提取班级代码
+     * 如："小班1班" -> "XB1"，"中班2班" -> "ZB2"，"大班3班" -> "DB3"
+     */
+    private String extractClassCode(String className) {
+        if (className == null || className.isBlank()) {
+            return "XX";
+        }
+        
+        // 提取班级类型和序号
+        Pattern pattern = Pattern.compile("(小|中|大)班(\\d+)班");
+        Matcher matcher = pattern.matcher(className);
+        
+        if (matcher.find()) {
+            String type = matcher.group(1);
+            String number = matcher.group(2);
+            
+            String typeCode;
+            switch (type) {
+                case "小":
+                    typeCode = "XB";
+                    break;
+                case "中":
+                    typeCode = "ZB";
+                    break;
+                case "大":
+                    typeCode = "DB";
+                    break;
+                default:
+                    typeCode = "XX";
+            }
+            
+            return typeCode + number;
+        }
+        
+        // 如果无法匹配，返回班级名称的前4个字符（大写）
+        String code = className.replaceAll("[^a-zA-Z0-9]", "").toUpperCase();
+        return code.length() > 4 ? code.substring(0, 4) : code;
     }
 }

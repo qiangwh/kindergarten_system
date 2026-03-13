@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.kindergarten.system.dto.FeeDetailQuery;
 import com.kindergarten.system.dto.StudentFeeDetail;
 
+import java.io.IOException;
+import java.io.OutputStream;
+
 import java.util.List;
 
 /**
@@ -30,6 +33,16 @@ public interface FeeDetailService {
      * @return 学生收费明细
      */
     StudentFeeDetail getStudentFeeDetail(Long studentId, Long semesterId);
+
+    /**
+     * 导出学生收费明细 PDF
+     *
+     * @param studentId  学生ID
+     * @param semesterId 学期ID
+     * @param outputStream 输出流
+     * @throws IOException 导出失败
+     */
+    void exportStudentFeeDetailPdf(Long studentId, Long semesterId, OutputStream outputStream) throws IOException;
 
     /**
      * 获取学期收费明细汇总（按班级）

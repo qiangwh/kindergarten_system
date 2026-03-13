@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import java.time.LocalDate;
 import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -39,6 +40,22 @@ public class StudentController {
     public Result<PageResult<Student>> page(StudentPageQuery query) {
         IPage<Student> page = studentService.pageStudents(query);
         return Result.success(PageResult.of(page));
+    }
+
+    /**
+     * 下载学生导入模板
+     *
+     * <p>返回一个仅包含表头的 Excel 模板，便于前端批量导入学生数据。</p>
+     *
+     * @param response HttpServletResponse
+     * @throws IOException 模板写出失败
+     */
+    @GetMapping("/template")
+    public void downloadTemplate(HttpServletResponse response) throws IOException {
+        String fileName = URLEncoder.encode("学生导入模板.xlsx", StandardCharsets.UTF_8.name());
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + fileName);
+        studentService.exportStudents(new StudentExportQuery(), response.getOutputStream());
     }
 
     /**
@@ -117,6 +134,10 @@ public class StudentController {
         Student student = studentService.getById(id);
         if (student != null) {
             student.setStatus("inactive");
+            // 设置离园日期为今天
+            if (student.getLeaveDate() == null) {
+                student.setLeaveDate(LocalDate.now());
+            }
             studentService.updateById(student);
         }
         return Result.success();

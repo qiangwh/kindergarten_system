@@ -7,8 +7,15 @@ import com.kindergarten.system.dto.FeeDetailQuery;
 import com.kindergarten.system.dto.StudentFeeDetail;
 import com.kindergarten.system.service.FeeDetailService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
@@ -75,6 +82,37 @@ public class FeeDetailController {
     public Result<List<FeeDetailService.ClassFeeSummary>> getClassSummary(
             @RequestParam Long semesterId) {
         return Result.success(feeDetailService.getClassFeeSummary(semesterId));
+    }
+
+    /**
+     * 导出单个学生收费明细PDF
+     *
+     * @param studentId 学生ID
+     * @param semesterId 学期ID
+     * @return PDF文件
+     */
+    @GetMapping("/student/{studentId}/export")
+    public ResponseEntity<byte[]> exportStudentDetailPdf(
+            @PathVariable Long studentId,
+            @RequestParam Long semesterId) throws IOException {
+        StudentFeeDetail detail = feeDetailService.getStudentFeeDetail(studentId, semesterId);
+        if (detail == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        feeDetailService.exportStudentFeeDetailPdf(studentId, semesterId, outputStream);
+        byte[] bytes = outputStream.toByteArray();
+
+        String fileName = String.format("%s-收费明细.pdf", detail.getStudentName());
+        String encoded = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
+        String contentDisposition = "attachment; filename*=UTF-8''" + encoded;
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                .contentLength(bytes.length)
+                .body(bytes);
     }
 
 }
