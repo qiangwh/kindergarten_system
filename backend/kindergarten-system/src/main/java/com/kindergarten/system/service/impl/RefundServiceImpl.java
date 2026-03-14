@@ -107,8 +107,13 @@ public class RefundServiceImpl implements RefundService {
         LocalDate rangeStart = resolveStartDate(semester, startDate);
         LocalDate rangeEnd = resolveEndDate(semester, endDate);
 
+        // 如果学生已离园，请假退费只计算到离园日期前一天
+        if (student.getLeaveDate() != null && student.getLeaveDate().isBefore(rangeEnd)) {
+            rangeEnd = student.getLeaveDate().minusDays(1);
+        }
+
         if (rangeStart.isAfter(rangeEnd)) {
-            throw new BusinessException(ResultCode.PARAM_ERROR);
+            return buildEmptyResult(student, semester, rangeStart, rangeEnd);
         }
 
         List<String> leaveDateStrs = attendanceMapper.selectLeaveDates(
@@ -615,7 +620,6 @@ public class RefundServiceImpl implements RefundService {
                 new LambdaQueryWrapper<RefundRecord>()
                         .eq(RefundRecord::getStudentId, studentId)
                         .eq(RefundRecord::getSemesterId, semesterId)
-                        .eq(RefundRecord::getRefundType, "LEAVE")
                         .eq(RefundRecord::getRefundType, "DROPOUT")
         );
 

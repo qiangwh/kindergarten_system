@@ -60,14 +60,15 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
 
     @Override
     public void updateStatus(Long id, String status) {
-        Student student = getById(id);
-        if (student == null) {
-            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
-        }
+        Student student = new Student();
+        student.setId(id);
         student.setStatus(status);
-        // 如果状态变为离园，且离园日期为空，则设置离园日期为今天
-        if ("inactive".equals(status) && student.getLeaveDate() == null) {
-            student.setLeaveDate(LocalDate.now());
+        // 如果状态变为离园,且离园日期为空,则设置离园日期为今天
+        if ("inactive".equals(status)) {
+            Student existStudent = getById(id);
+            if (existStudent != null && existStudent.getLeaveDate() == null) {
+                student.setLeaveDate(LocalDate.now());
+            }
         }
         // 如果状态复园（active），清空离园日期
         if ("active".equals(status)) {

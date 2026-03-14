@@ -478,6 +478,16 @@ public class FeeDetailServiceImpl implements FeeDetailService {
             // 退费计算失败时忽略，按0处理
         }
 
+        // 按费用类型汇总退费金额
+        Map<String, BigDecimal> refundByTypeCode = new java.util.HashMap<>();
+        for (StudentFeeDetail.RefundSegment segment : refundSegments) {
+            if (segment.getRefundItems() != null) {
+                for (StudentFeeDetail.RefundItem item : segment.getRefundItems()) {
+                    refundByTypeCode.merge(item.getFeeTypeCode(), item.getAmount(), BigDecimal::add);
+                }
+            }
+        }
+
         // 构建费用类型明细
         List<StudentFeeDetail.FeeTypeDetail> feeTypeDetails = new ArrayList<>();
         BigDecimal totalPaid = BigDecimal.ZERO;
@@ -489,10 +499,11 @@ public class FeeDetailServiceImpl implements FeeDetailService {
             ftDetail.setFeeTypeName(feeType.getTypeName());
 
             BigDecimal paid = paidByType.getOrDefault(feeType.getId(), BigDecimal.ZERO);
+            BigDecimal refund = refundByTypeCode.getOrDefault(feeType.getTypeCode(), BigDecimal.ZERO);
 
             ftDetail.setPaidAmount(paid);
-            ftDetail.setRefundAmount(BigDecimal.ZERO); // 退费不按费用类型分组
-            ftDetail.setActualAmount(paid);
+            ftDetail.setRefundAmount(refund);
+            ftDetail.setActualAmount(paid.subtract(refund));
 
             feeTypeDetails.add(ftDetail);
 
@@ -504,6 +515,64 @@ public class FeeDetailServiceImpl implements FeeDetailService {
         detail.setTotalRefund(totalRefundAmount);
         detail.setActualAmount(totalPaid.subtract(totalRefundAmount));
         detail.setRefundSegments(refundSegments);
+
+        // 获取上学期数据
+        if (previousSemesterId != null) {
+            Semester prevSemester = semesterMapper.selectById(previousSemesterId);
+            detail.setPreviousSemesterName(prevSemester != null ? prevSemester.getSemesterName() : null);
+            
+            RefundCalculateResult prevRefund = refundService.getSavedRefund(student.getId(), previousSemesterId);
+            if (prevRefund != null) {
+                detail.setPreviousSemesterRefund(prevRefund.getTotalRefundAmount());
+                if (prevRefund.getLeaveSegments() != null) {
+                    List<StudentFeeDetail.RefundSegment> prevSegments = new ArrayList<>();
+                    for (LeaveSegment seg : prevRefund.getLeaveSegments()) {
+                        StudentFeeDetail.RefundSegment rs = new StudentFeeDetail.RefundSegment();
+                        rs.setStartDate(seg.getStartDate());
+                        rs.setEndDate(seg.getEndDate());
+                        rs.setDays(seg.getDays());
+                        rs.setMatchedRuleType(seg.getMatchedRuleType());
+                        rs.setSegmentAmount(seg.getSegmentAmount());
+                        if (seg.getRefundItems() != null) {
+                            List<StudentFeeDetail.RefundItem> items = new ArrayList<>();
+                            for (RefundItem item : seg.getRefundItems()) {
+                                StudentFeeDetail.RefundItem ri = new StudentFeeDetail.RefundItem();
+                                ri.setFeeTypeCode(item.getFeeTypeCode());
+                                ri.setFeeTypeName(item.getFeeTypeName());
+                                ri.setDailyRate(item.getDailyRate());
+                                ri.setAmount(item.getAmount());
+                                items.add(ri);
+                            }
+                            rs.setRefundItems(items);
+                        }
+                        prevSegments.add(rs);
+                    }
+                    detail.setPreviousSemesterRefundSegments(prevSegments);
+                }
+            }
+            
+            List<PaymentRecord> prevPayments = paymentRecordMapper.selectList(
+                    new LambdaQueryWrapper<PaymentRecord>()
+                            .eq(PaymentRecord::getStudentId, student.getId())
+                            .eq(PaymentRecord::getSemesterId, previousSemesterId));
+            BigDecimal prevPaid = prevPayments.stream()
+                    .map(PaymentRecord::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            detail.setPreviousSemesterPaid(prevPaid);
+            detail.setPreviousSemesterActual(prevPaid.subtract(detail.getPreviousSemesterRefund() != null ? detail.getPreviousSemesterRefund() : BigDecimal.ZERO));
+            
+            // 转换上学期缴费记录
+            List<StudentFeeDetail.PaymentItem> paymentItems = new ArrayList<>();
+            for (PaymentRecord payment : prevPayments) {
+                StudentFeeDetail.PaymentItem item = new StudentFeeDetail.PaymentItem();
+                FeeType feeType = payment.getFeeTypeId() != null ? feeTypeMap.get(payment.getFeeTypeId()) : null;
+                item.setFeeTypeName(feeType != null ? feeType.getTypeName() : "");
+                item.setAmount(payment.getAmount());
+                item.setPayDate(payment.getPayDate() != null ? payment.getPayDate().toString() : "");
+                paymentItems.add(item);
+            }
+            detail.setPreviousSemesterPayments(paymentItems);
+        }
 
         // 获取考勤统计（请假天数从退费计算结果获取）
         detail.setAttendanceSummary(buildAttendanceSummary(student.getId(), semester, totalLeaveDays));

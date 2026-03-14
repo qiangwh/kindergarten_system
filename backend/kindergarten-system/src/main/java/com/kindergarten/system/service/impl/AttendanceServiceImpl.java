@@ -68,6 +68,14 @@ public class AttendanceServiceImpl extends ServiceImpl<AttendanceMapper, Attenda
                 .distinct()
                 .toList();
 
+        // 校验学生是否已离园
+        List<Student> students = studentMapper.selectBatchIds(studentIds);
+        for (Student student : students) {
+            if (student.getLeaveDate() != null && !attendDate.isBefore(student.getLeaveDate())) {
+                throw new IllegalArgumentException("学生 " + student.getName() + " 已于 " + student.getLeaveDate() + " 离园，不能录入考勤");
+            }
+        }
+
         // 删除已有记录
         remove(new LambdaQueryWrapper<Attendance>()
                 .eq(Attendance::getAttendDate, attendDate)
@@ -105,6 +113,20 @@ public class AttendanceServiceImpl extends ServiceImpl<AttendanceMapper, Attenda
             throw new IllegalArgumentException("开始日期不能晚于结束日期");
         }
 
+        // 获取所有学生ID
+        List<Long> studentIds = items.stream()
+                .map(AttendanceBatchRequest.AttendanceBatchItem::getStudentId)
+                .distinct()
+                .toList();
+
+        // 校验学生是否已离园
+        List<Student> students = studentMapper.selectBatchIds(studentIds);
+        for (Student student : students) {
+            if (student.getLeaveDate() != null && !endDate.isBefore(student.getLeaveDate())) {
+                throw new IllegalArgumentException("学生 " + student.getName() + " 已于 " + student.getLeaveDate() + " 离园，不能录入考勤");
+            }
+        }
+
         // 获取日期范围内的所有日期
         List<LocalDate> dates = new ArrayList<>();
         LocalDate current = startDate;
@@ -112,12 +134,6 @@ public class AttendanceServiceImpl extends ServiceImpl<AttendanceMapper, Attenda
             dates.add(current);
             current = current.plusDays(1);
         }
-
-        // 获取所有学生ID
-        List<Long> studentIds = items.stream()
-                .map(AttendanceBatchRequest.AttendanceBatchItem::getStudentId)
-                .distinct()
-                .toList();
 
         // 删除日期范围内的已有记录
         remove(new LambdaQueryWrapper<Attendance>()
@@ -182,6 +198,13 @@ public class AttendanceServiceImpl extends ServiceImpl<AttendanceMapper, Attenda
 
         if (students.isEmpty()) {
             return;
+        }
+
+        // 校验学生是否已离园
+        for (Student student : students) {
+            if (student.getLeaveDate() != null && !endDate.isBefore(student.getLeaveDate())) {
+                throw new IllegalArgumentException("学生 " + student.getName() + " 已于 " + student.getLeaveDate() + " 离园，不能录入考勤");
+            }
         }
 
         List<Long> studentIds = students.stream()
@@ -369,6 +392,16 @@ public class AttendanceServiceImpl extends ServiceImpl<AttendanceMapper, Attenda
                     result.addError(rowNum + 1, studentName, "学生不存在");
                     result.setFailCount(result.getFailCount() + 1);
                     continue;
+                }
+
+                // 校验学生是否已离园
+                if (student.getLeaveDate() != null && !dates.isEmpty()) {
+                    LocalDate maxDate = dates.stream().max(LocalDate::compareTo).orElse(null);
+                    if (maxDate != null && !maxDate.isBefore(student.getLeaveDate())) {
+                        result.addError(rowNum + 1, studentName, "学生已于 " + student.getLeaveDate() + " 离园");
+                        result.setFailCount(result.getFailCount() + 1);
+                        continue;
+                    }
                 }
 
                 // 遍历日期列

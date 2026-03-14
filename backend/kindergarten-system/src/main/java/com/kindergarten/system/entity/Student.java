@@ -57,6 +57,7 @@ public class Student extends BaseEntity {
 
     /** 离园日期 */
     @JsonFormat(pattern = "yyyy-MM-dd")
+    @TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
     private LocalDate leaveDate;
 
     /** 状态：active-在读，inactive-离园 */

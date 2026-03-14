@@ -57,7 +57,38 @@ public class StudentFeeDetail {
     /** 考勤统计 */
     private AttendanceSummary attendanceSummary;
 
+    /** 上学期缴费金额 */
+    private BigDecimal previousSemesterPaid;
+
+    /** 上学期退费金额 */
+    private BigDecimal previousSemesterRefund;
+
+    /** 上学期实收金额 */
+    private BigDecimal previousSemesterActual;
+
+    /** 上学期退费明细 */
+    private List<RefundSegment> previousSemesterRefundSegments;
+
+    /** 上学期名称 */
+    private String previousSemesterName;
+
+    /** 上学期缴费记录列表 */
+    private List<PaymentItem> previousSemesterPayments;
+
     // ==================== 内部类 ====================
+
+    /**
+     * 缴费记录项
+     */
+    @Data
+    public static class PaymentItem {
+        /** 费用类型名称 */
+        private String feeTypeName;
+        /** 缴费金额 */
+        private BigDecimal amount;
+        /** 缴费日期 */
+        private String payDate;
+    }
 
     /**
      * 费用类型明细
