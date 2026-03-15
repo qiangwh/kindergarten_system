@@ -11,6 +11,7 @@ import com.kindergarten.system.mapper.AttendanceMapper;
 import com.kindergarten.system.mapper.ClassInfoMapper;
 import com.kindergarten.system.mapper.StudentMapper;
 import com.kindergarten.system.service.AttendanceService;
+import com.kindergarten.system.service.RefundService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
@@ -48,6 +49,7 @@ public class AttendanceServiceImpl extends ServiceImpl<AttendanceMapper, Attenda
 
     private final StudentMapper studentMapper;
     private final ClassInfoMapper classInfoMapper;
+    private final RefundService refundService;
 
     @Override
     public List<Attendance> listByDate(AttendanceListQuery query) {
@@ -94,6 +96,14 @@ public class AttendanceServiceImpl extends ServiceImpl<AttendanceMapper, Attenda
                 })
                 .toList();
         saveBatch(attendanceList);
+        
+        // 异步计算退费
+        asyncCalculateRefund(studentIds, attendDate);
+    }
+    
+    @org.springframework.scheduling.annotation.Async
+    public void asyncCalculateRefund(List<Long> studentIds, LocalDate attendDate) {
+        // 异步计算退费暂不实现，保留接口供后续扩展
     }
 
     @Override
