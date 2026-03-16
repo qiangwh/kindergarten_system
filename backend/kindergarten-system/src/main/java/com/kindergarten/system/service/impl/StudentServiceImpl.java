@@ -31,6 +31,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.List;
@@ -44,6 +45,36 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
 
     public StudentServiceImpl(ClassInfoMapper classInfoMapper) {
         this.classInfoMapper = classInfoMapper;
+    }
+
+    @Override
+    public boolean save(Student student) {
+        // 如果学号为空，自动生成学号
+        if (student.getStudentNo() == null || student.getStudentNo().isBlank()) {
+            if (student.getClassId() != null) {
+                ClassInfo classInfo = classInfoMapper.selectById(student.getClassId());
+                if (classInfo != null) {
+                    student.setStudentNo(generateStudentNo(classInfo, student.getEnrollDate()));
+                }
+            }
+        }
+        return super.save(student);
+    }
+
+    @Override
+    public boolean saveBatch(Collection<Student> entityList) {
+        // 批量保存时，为没有学号的学生生成学号
+        for (Student student : entityList) {
+            if (student.getStudentNo() == null || student.getStudentNo().isBlank()) {
+                if (student.getClassId() != null) {
+                    ClassInfo classInfo = classInfoMapper.selectById(student.getClassId());
+                    if (classInfo != null) {
+                        student.setStudentNo(generateStudentNo(classInfo, student.getEnrollDate()));
+                    }
+                }
+            }
+        }
+        return super.saveBatch(entityList);
     }
 
     @Override
