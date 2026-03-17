@@ -1,0 +1,7 @@
+target/
+!target/kindergarten-system-1.0.0.jar
+.git
+.gitignore
+*.md
+*.log
+.DS_Store
