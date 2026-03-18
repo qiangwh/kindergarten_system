@@ -1,5 +1,6 @@
 package com.kindergarten.system.controller;
 
+import com.kindergarten.system.common.result.PageResult;
 import com.kindergarten.system.common.result.Result;
 import com.kindergarten.system.entity.FeeType;
 import com.kindergarten.system.service.FeeTypeService;
@@ -29,10 +30,18 @@ public class FeeTypeController {
     /**
      * 查询收费类型列表
      *
+     * @param page     页码（可选）
+     * @param pageSize 每页条数（可选）
+     * @param typeName 费用类型名称（可选，模糊查询）
      * @return 收费类型列表
      */
     @GetMapping("/list")
-    public Result<List<FeeType>> list() {
+    public Result<?> list(@RequestParam(required = false) Long page,
+                          @RequestParam(required = false) Long pageSize,
+                          @RequestParam(required = false) String typeName) {
+        if (page != null || pageSize != null || (typeName != null && !typeName.isBlank())) {
+            return Result.success(PageResult.of(feeTypeService.pageList(typeName, page, pageSize)));
+        }
         return Result.success(feeTypeService.listEnabled());
     }
 

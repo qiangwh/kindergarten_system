@@ -6,6 +6,7 @@
  */
 package com.kindergarten.system.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.kindergarten.system.entity.ClassInfo;
 
@@ -27,5 +28,16 @@ public interface ClassInfoService extends IService<ClassInfo> {
      * @return 班级列表
      */
     List<ClassInfo> listByClassType(Long classTypeId);
+
+    /**
+     * 分页查询班级列表
+     *
+     * @param className   班级名称（模糊查询）
+     * @param classTypeId 班级类型ID
+     * @param page        页码
+     * @param pageSize    每页条数
+     * @return 班级分页数据
+     */
+    IPage<ClassInfo> pageClasses(String className, Long classTypeId, Long page, Long pageSize);
 
 }

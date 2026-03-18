@@ -1,5 +1,6 @@
 package com.kindergarten.system.controller;
 
+import com.kindergarten.system.common.result.PageResult;
 import com.kindergarten.system.common.result.Result;
 import com.kindergarten.system.entity.Semester;
 import com.kindergarten.system.service.SemesterService;
@@ -29,10 +30,18 @@ public class SemesterController {
     /**
      * 学期列表
      *
+     * @param page         页码（可选）
+     * @param pageSize     每页条数（可选）
+     * @param semesterName 学期名称（可选，模糊查询）
      * @return 学期列表
      */
     @GetMapping("/list")
-    public Result<List<Semester>> list() {
+    public Result<?> list(@RequestParam(required = false) Long page,
+                          @RequestParam(required = false) Long pageSize,
+                          @RequestParam(required = false) String semesterName) {
+        if (page != null || pageSize != null || (semesterName != null && !semesterName.isBlank())) {
+            return Result.success(PageResult.of(semesterService.pageList(semesterName, page, pageSize)));
+        }
         return Result.success(semesterService.list());
     }
 

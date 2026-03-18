@@ -9,6 +9,7 @@
  */
 package com.kindergarten.system.controller;
 
+import com.kindergarten.system.common.result.PageResult;
 import com.kindergarten.system.common.result.Result;
 import com.kindergarten.system.entity.ClassInfo;
 import com.kindergarten.system.service.ClassInfoService;
@@ -29,11 +30,20 @@ public class ClassInfoController {
     /**
      * 班级列表
      *
+     * @param page        页码（可选）
+     * @param pageSize    每页条数（可选）
+     * @param className   班级名称（可选，模糊查询）
      * @param classTypeId 班级类型ID（可选）
      * @return 班级列表
      */
     @GetMapping("/list")
-    public Result<List<ClassInfo>> list(@RequestParam(required = false) Long classTypeId) {
+    public Result<?> list(@RequestParam(required = false) Long page,
+                          @RequestParam(required = false) Long pageSize,
+                          @RequestParam(required = false) String className,
+                          @RequestParam(required = false) Long classTypeId) {
+        if (page != null || pageSize != null || (className != null && !className.isBlank())) {
+            return Result.success(PageResult.of(classInfoService.pageClasses(className, classTypeId, page, pageSize)));
+        }
         if (classTypeId != null) {
             return Result.success(classInfoService.listByClassType(classTypeId));
         }

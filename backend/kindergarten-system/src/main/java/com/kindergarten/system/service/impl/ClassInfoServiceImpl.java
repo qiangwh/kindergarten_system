@@ -7,6 +7,8 @@
 package com.kindergarten.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.kindergarten.system.entity.ClassInfo;
 import com.kindergarten.system.entity.ClassType;
@@ -52,6 +54,23 @@ public class ClassInfoServiceImpl extends ServiceImpl<ClassInfoMapper, ClassInfo
         fillClassTypeName(classList);
 
         return classList;
+    }
+
+    @Override
+    public IPage<ClassInfo> pageClasses(String className, Long classTypeId, Long page, Long pageSize) {
+        long current = page == null || page < 1 ? 1 : page;
+        long size = pageSize == null || pageSize < 1 ? 10 : pageSize;
+
+        Page<ClassInfo> classPage = new Page<>(current, size);
+        IPage<ClassInfo> result = page(classPage, new LambdaQueryWrapper<ClassInfo>()
+                .eq(ClassInfo::getStatus, 1)
+                .like(className != null && !className.isBlank(), ClassInfo::getClassName, className)
+                .eq(classTypeId != null, ClassInfo::getClassTypeId, classTypeId)
+                .orderByDesc(ClassInfo::getGradeYear)
+                .orderByAsc(ClassInfo::getId));
+
+        fillClassTypeName(result.getRecords());
+        return result;
     }
 
     /**
