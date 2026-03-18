@@ -40,6 +40,19 @@
         ORDER BY s.id DESC
     </select>
 
+    <select id="selectActiveStudentCountsByClass" resultType="com.kindergarten.system.dto.DashboardOverview$ClassStudentCount">
+        SELECT c.id AS classId,
+               c.class_name AS className,
+               COUNT(s.id) AS count
+        FROM class_info c
+        LEFT JOIN student s
+               ON s.class_id = c.id
+              AND s.status = 'active'
+        WHERE c.status = 1
+        GROUP BY c.id, c.class_name, c.grade_year
+        ORDER BY c.grade_year DESC, c.id ASC
+    </select>
+
 
     <select id="selectMaxStudentNoSequence" resultType="java.lang.Integer">
         SELECT MAX(CAST(SUBSTRING_INDEX(student_no, '-', -1) AS UNSIGNED))

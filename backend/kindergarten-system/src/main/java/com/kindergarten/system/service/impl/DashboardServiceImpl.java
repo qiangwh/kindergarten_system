@@ -6,6 +6,8 @@ import com.kindergarten.system.dto.DashboardOverview.AttendanceOverview;
 import com.kindergarten.system.dto.DashboardOverview.ClassStudentCount;
 import com.kindergarten.system.dto.DashboardOverview.CurrentSemester;
 import com.kindergarten.system.dto.DashboardOverview.FeeTypeAmount;
+import com.kindergarten.system.dto.AttendanceMonthStatItem;
+import com.kindergarten.system.dto.FeeTypeSummaryItem;
 import com.kindergarten.system.entity.*;
 import com.kindergarten.system.mapper.*;
 import com.kindergarten.system.service.DashboardService;
@@ -29,8 +31,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final StudentMapper studentMapper;
     private final ClassInfoMapper classInfoMapper;
     private final SemesterMapper semesterMapper;
-    private final PaymentRecordMapper paymentRecordMapper;
-    private final FeeTypeMapper feeTypeMapper;
+    private final FeeSummaryMapper feeSummaryMapper;
     private final AttendanceMapper attendanceMapper;
 
     @Override
@@ -63,27 +64,10 @@ public class DashboardServiceImpl implements DashboardService {
         );
         overview.setActiveStudentCount(activeCount);
 
-        // 各班级人数
-        List<ClassInfo> classes = classInfoMapper.selectList(
-                new LambdaQueryWrapper<ClassInfo>()
-                        .eq(ClassInfo::getStatus, 1)
-                        .orderByDesc(ClassInfo::getGradeYear)
-                        .orderByAsc(ClassInfo::getId)
-        );
-
-        List<ClassStudentCount> classCounts = new ArrayList<>();
-        for (ClassInfo classInfo : classes) {
-            Long count = studentMapper.selectCount(
-                    new LambdaQueryWrapper<Student>()
-                            .eq(Student::getClassId, classInfo.getId())
-                            .eq(Student::getStatus, "active")
-            );
-
-            ClassStudentCount item = new ClassStudentCount();
-            item.setClassId(classInfo.getId());
-            item.setClassName(classInfo.getClassName());
-            item.setCount(count);
-            classCounts.add(item);
+        // 各班级人数（一次聚合查询，避免 N+1）
+        List<ClassStudentCount> classCounts = studentMapper.selectActiveStudentCountsByClass();
+        if (classCounts == null) {
+            classCounts = new ArrayList<>();
         }
         overview.setClassStudentCounts(classCounts);
     }
@@ -119,37 +103,21 @@ public class DashboardServiceImpl implements DashboardService {
 
         Long semesterId = overview.getCurrentSemester().getId();
 
-        // 本学期总收费
-        List<PaymentRecord> records = paymentRecordMapper.selectList(
-                new LambdaQueryWrapper<PaymentRecord>()
-                        .eq(PaymentRecord::getSemesterId, semesterId)
+        overview.setCurrentSemesterFeeTotal(
+                java.util.Optional.ofNullable(feeSummaryMapper.selectSemesterTotal(semesterId))
+                        .orElse(BigDecimal.ZERO)
         );
 
-        BigDecimal total = records.stream()
-                .map(PaymentRecord::getAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        overview.setCurrentSemesterFeeTotal(total);
-
-        // 按费用类型分组
-        Map<Long, BigDecimal> amountByFeeType = records.stream()
-                .collect(Collectors.groupingBy(
-                        PaymentRecord::getFeeTypeId,
-                        Collectors.reducing(BigDecimal.ZERO, PaymentRecord::getAmount, BigDecimal::add)
-                ));
-
-        // 获取费用类型信息
-        List<FeeType> feeTypes = feeTypeMapper.selectList(
-                new LambdaQueryWrapper<FeeType>()
-                        .eq(FeeType::getStatus, 1)
-        );
-
+        List<FeeTypeSummaryItem> byFeeType = feeSummaryMapper.selectSemesterByFeeType(semesterId);
         List<FeeTypeAmount> feeTypeAmounts = new ArrayList<>();
-        for (FeeType feeType : feeTypes) {
-            FeeTypeAmount item = new FeeTypeAmount();
-            item.setTypeCode(feeType.getTypeCode());
-            item.setFeeTypeName(feeType.getTypeName());
-            item.setAmount(amountByFeeType.getOrDefault(feeType.getId(), BigDecimal.ZERO));
-            feeTypeAmounts.add(item);
+        if (byFeeType != null) {
+            for (FeeTypeSummaryItem feeTypeSummaryItem : byFeeType) {
+                FeeTypeAmount item = new FeeTypeAmount();
+                item.setTypeCode(feeTypeSummaryItem.getTypeCode());
+                item.setFeeTypeName(feeTypeSummaryItem.getFeeTypeName());
+                item.setAmount(feeTypeSummaryItem.getAmount());
+                feeTypeAmounts.add(item);
+            }
         }
         overview.setCurrentSemesterFeeByType(feeTypeAmounts);
     }
@@ -162,26 +130,13 @@ public class DashboardServiceImpl implements DashboardService {
         String startDate = now.withDayOfMonth(1).toString();
         String endDate = now.withDayOfMonth(now.lengthOfMonth()).toString();
 
-        // 查询本月所有考勤记录
-        List<Attendance> attendances = attendanceMapper.selectList(
-                new LambdaQueryWrapper<Attendance>()
-                        .between(Attendance::getAttendDate, startDate, endDate)
-        );
-
-        long presentCount = attendances.stream()
-                .filter(a -> "present".equals(a.getStatus()))
-                .count();
-        long leaveCount = attendances.stream()
-                .filter(a -> "leave".equals(a.getStatus()))
-                .count();
-        long absentCount = attendances.stream()
-                .filter(a -> "absent".equals(a.getStatus()))
-                .count();
+        // 本月考勤概览（直接用数据库聚合）
+        AttendanceMonthStatItem monthSummary = attendanceMapper.selectMonthSummary(null, startDate, endDate);
 
         AttendanceOverview attendanceOverview = new AttendanceOverview();
-        attendanceOverview.setPresentDays(presentCount);
-        attendanceOverview.setLeaveDays(leaveCount);
-        attendanceOverview.setAbsentDays(absentCount);
+        attendanceOverview.setPresentDays(monthSummary == null || monthSummary.getPresentDays() == null ? 0L : monthSummary.getPresentDays().longValue());
+        attendanceOverview.setLeaveDays(monthSummary == null || monthSummary.getLeaveDays() == null ? 0L : monthSummary.getLeaveDays().longValue());
+        attendanceOverview.setAbsentDays(monthSummary == null || monthSummary.getAbsentDays() == null ? 0L : monthSummary.getAbsentDays().longValue());
         overview.setAttendanceThisMonth(attendanceOverview);
     }
 

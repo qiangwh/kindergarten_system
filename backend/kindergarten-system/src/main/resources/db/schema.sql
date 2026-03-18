@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS class_info (
   updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uk_class_name_year (class_name, grade_year),
   KEY idx_class_type (class_type_id),
+  KEY idx_class_status_grade (status, grade_year, id),
   CONSTRAINT fk_class_type FOREIGN KEY (class_type_id) REFERENCES class_type(id)
 ) COMMENT='班级';
 
@@ -90,6 +91,7 @@ CREATE TABLE IF NOT EXISTS student (
   created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_student_class (class_id),
+  KEY idx_student_class_status (class_id, status),
   KEY idx_student_status (status),
   KEY idx_student_no (student_no),
   CONSTRAINT fk_student_class FOREIGN KEY (class_id) REFERENCES class_info(id)
@@ -110,6 +112,8 @@ CREATE TABLE IF NOT EXISTS payment_record (
   created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_pay_student (student_id),
+  KEY idx_pay_semester_student (semester_id, student_id),
+  KEY idx_pay_semester_fee_type (semester_id, fee_type_id),
   KEY idx_pay_semester (semester_id),
   KEY idx_pay_fee_type (fee_type_id),
   KEY idx_pay_date (pay_date),
@@ -131,6 +135,7 @@ CREATE TABLE IF NOT EXISTS attendance (
   updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uk_att_student_date (student_id, attend_date),
   KEY idx_att_class_date (class_id, attend_date),
+  KEY idx_att_student_status_date (student_id, status, attend_date),
   KEY idx_att_status (status),
   CONSTRAINT fk_att_student FOREIGN KEY (student_id) REFERENCES student(id),
   CONSTRAINT fk_att_class FOREIGN KEY (class_id) REFERENCES class_info(id)
