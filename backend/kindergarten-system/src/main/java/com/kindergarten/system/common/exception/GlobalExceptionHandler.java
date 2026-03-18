@@ -5,6 +5,8 @@ import com.kindergarten.system.common.result.ResultCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -22,6 +24,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadCredentialsException.class)
     public Result<Void> handleBadCredentialsException(BadCredentialsException e) {
         log.warn("认证失败: {}", e.getMessage());
+        return Result.error(ResultCode.UNAUTHORIZED.getCode(), "用户名或密码错误");
+    }
+
+    @ExceptionHandler(DisabledException.class)
+    public Result<Void> handleDisabledException(DisabledException e) {
+        log.warn("账号已禁用: {}", e.getMessage());
+        return Result.error(ResultCode.UNAUTHORIZED.getCode(), "账号已禁用");
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public Result<Void> handleAuthenticationException(AuthenticationException e) {
+        log.warn("认证异常: {}", e.getMessage());
         return Result.error(ResultCode.UNAUTHORIZED);
     }
 
