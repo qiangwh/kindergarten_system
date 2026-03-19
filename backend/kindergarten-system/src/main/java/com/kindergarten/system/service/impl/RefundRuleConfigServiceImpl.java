@@ -8,6 +8,9 @@ import com.kindergarten.system.dto.RefundRuleConfigQuery;
 import com.kindergarten.system.entity.RefundRuleConfig;
 import com.kindergarten.system.mapper.RefundRuleConfigMapper;
 import com.kindergarten.system.service.RefundRuleConfigService;
+import org.springframework.cache.annotation.CacheConfig;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -20,10 +23,12 @@ import java.util.List;
  * @since 1.0.0
  */
 @Service
+@CacheConfig(cacheNames = "refundRuleConfig")
 public class RefundRuleConfigServiceImpl extends ServiceImpl<RefundRuleConfigMapper, RefundRuleConfig>
         implements RefundRuleConfigService {
 
     @Override
+    @Cacheable(key = "T(com.kindergarten.system.common.cache.CacheKeyUtil).key(#query.ruleType, #query.feeTypeCode, #query.semesterId, #query.page, #query.pageSize)")
     public IPage<RefundRuleConfig> pageList(RefundRuleConfigQuery query) {
         if (query.getPage() == null || query.getPage() < 1) {
             query.setPage(1L);
@@ -58,6 +63,7 @@ public class RefundRuleConfigServiceImpl extends ServiceImpl<RefundRuleConfigMap
     }
 
     @Override
+    @Cacheable(key = "'enabled'")
     public List<RefundRuleConfig> listEnabled() {
         LambdaQueryWrapper<RefundRuleConfig> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(RefundRuleConfig::getStatus, 1);
@@ -66,11 +72,13 @@ public class RefundRuleConfigServiceImpl extends ServiceImpl<RefundRuleConfigMap
     }
 
     @Override
+    @Cacheable(key = "T(com.kindergarten.system.common.cache.CacheKeyUtil).key('id', #id)")
     public RefundRuleConfig getById(Long id) {
         return baseMapper.selectById(id);
     }
 
     @Override
+    @CacheEvict(allEntries = true)
     public boolean saveConfig(RefundRuleConfig config) {
         // 默认启用状态
         if (config.getStatus() == null) {
@@ -80,11 +88,13 @@ public class RefundRuleConfigServiceImpl extends ServiceImpl<RefundRuleConfigMap
     }
 
     @Override
+    @CacheEvict(allEntries = true)
     public boolean updateConfig(RefundRuleConfig config) {
         return baseMapper.updateById(config) > 0;
     }
 
     @Override
+    @CacheEvict(allEntries = true)
     public void delete(Long id) {
         RefundRuleConfig config = baseMapper.selectById(id);
         if (config != null) {

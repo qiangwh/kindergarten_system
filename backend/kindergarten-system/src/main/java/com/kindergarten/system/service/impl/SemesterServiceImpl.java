@@ -10,14 +10,22 @@ import com.kindergarten.system.common.result.ResultCode;
 import com.kindergarten.system.entity.Semester;
 import com.kindergarten.system.mapper.SemesterMapper;
 import com.kindergarten.system.service.SemesterService;
+import org.springframework.cache.annotation.CacheConfig;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.io.Serializable;
+
 @Service
+@CacheConfig(cacheNames = "semester")
 public class SemesterServiceImpl extends ServiceImpl<SemesterMapper, Semester> implements SemesterService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(allEntries = true)
     public void setCurrent(Long id) {
         Semester target = getById(id);
         if (target == null) {
@@ -31,6 +39,7 @@ public class SemesterServiceImpl extends ServiceImpl<SemesterMapper, Semester> i
     }
 
     @Override
+    @Cacheable(key = "'current'")
     public Semester findCurrent() {
         return getOne(new LambdaQueryWrapper<Semester>()
                 .eq(Semester::getIsCurrent, 1)
@@ -38,6 +47,13 @@ public class SemesterServiceImpl extends ServiceImpl<SemesterMapper, Semester> i
     }
 
     @Override
+    @Cacheable(key = "'all'")
+    public List<Semester> list() {
+        return super.list();
+    }
+
+    @Override
+    @Cacheable(key = "T(com.kindergarten.system.common.cache.CacheKeyUtil).key(#semesterName, #page, #pageSize)")
     public IPage<Semester> pageList(String semesterName, Long page, Long pageSize) {
         long current = page == null || page < 1 ? 1 : page;
         long size = pageSize == null || pageSize < 1 ? 10 : pageSize;
@@ -47,5 +63,23 @@ public class SemesterServiceImpl extends ServiceImpl<SemesterMapper, Semester> i
                 .like(semesterName != null && !semesterName.isBlank(), Semester::getSemesterName, semesterName)
                 .orderByDesc(Semester::getIsCurrent)
                 .orderByDesc(Semester::getId));
+    }
+
+    @Override
+    @CacheEvict(allEntries = true)
+    public boolean save(Semester entity) {
+        return super.save(entity);
+    }
+
+    @Override
+    @CacheEvict(allEntries = true)
+    public boolean updateById(Semester entity) {
+        return super.updateById(entity);
+    }
+
+    @Override
+    @CacheEvict(allEntries = true)
+    public boolean removeById(Serializable id) {
+        return super.removeById(id);
     }
 }

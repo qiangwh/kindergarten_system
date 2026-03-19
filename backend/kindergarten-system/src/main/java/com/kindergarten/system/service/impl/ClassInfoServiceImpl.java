@@ -13,23 +13,30 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.kindergarten.system.entity.ClassInfo;
 import com.kindergarten.system.entity.ClassType;
 import com.kindergarten.system.mapper.ClassInfoMapper;
-import com.kindergarten.system.mapper.ClassTypeMapper;
 import com.kindergarten.system.service.ClassInfoService;
+import com.kindergarten.system.service.ClassTypeService;
+import com.kindergarten.system.common.cache.CacheKeyUtil;
+import org.springframework.cache.annotation.CacheConfig;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.io.Serializable;
 import java.util.stream.Collectors;
 
 @Service
+@CacheConfig(cacheNames = "classInfo")
 @RequiredArgsConstructor
 public class ClassInfoServiceImpl extends ServiceImpl<ClassInfoMapper, ClassInfo> implements ClassInfoService {
 
-    /** 班级类型 Mapper */
-    private final ClassTypeMapper classTypeMapper;
+    /** 班级类型服务 */
+    private final ClassTypeService classTypeService;
 
     @Override
+    @Cacheable(key = "'enabled'")
     public List<ClassInfo> listEnabled() {
         // 查询启用的班级
         List<ClassInfo> classList = list(new LambdaQueryWrapper<ClassInfo>()
@@ -44,6 +51,7 @@ public class ClassInfoServiceImpl extends ServiceImpl<ClassInfoMapper, ClassInfo
     }
 
     @Override
+    @Cacheable(key = "T(com.kindergarten.system.common.cache.CacheKeyUtil).key('classType', #classTypeId)")
     public List<ClassInfo> listByClassType(Long classTypeId) {
         List<ClassInfo> classList = list(new LambdaQueryWrapper<ClassInfo>()
                 .eq(ClassInfo::getStatus, 1)
@@ -57,6 +65,7 @@ public class ClassInfoServiceImpl extends ServiceImpl<ClassInfoMapper, ClassInfo
     }
 
     @Override
+    @Cacheable(key = "T(com.kindergarten.system.common.cache.CacheKeyUtil).key(#className, #classTypeId, #page, #pageSize)")
     public IPage<ClassInfo> pageClasses(String className, Long classTypeId, Long page, Long pageSize) {
         long current = page == null || page < 1 ? 1 : page;
         long size = pageSize == null || pageSize < 1 ? 10 : pageSize;
@@ -71,6 +80,24 @@ public class ClassInfoServiceImpl extends ServiceImpl<ClassInfoMapper, ClassInfo
 
         fillClassTypeName(result.getRecords());
         return result;
+    }
+
+    @Override
+    @CacheEvict(allEntries = true)
+    public boolean save(ClassInfo entity) {
+        return super.save(entity);
+    }
+
+    @Override
+    @CacheEvict(allEntries = true)
+    public boolean updateById(ClassInfo entity) {
+        return super.updateById(entity);
+    }
+
+    @Override
+    @CacheEvict(allEntries = true)
+    public boolean removeById(Serializable id) {
+        return super.removeById(id);
     }
 
     /**
@@ -90,11 +117,10 @@ public class ClassInfoServiceImpl extends ServiceImpl<ClassInfoMapper, ClassInfo
                 .collect(Collectors.toList());
 
         // 查询班级类型
-        List<ClassType> typeList = classTypeMapper.selectList(
-                new LambdaQueryWrapper<ClassType>()
-                        .in(ClassType::getId, typeIds));
+        List<ClassType> typeList = classTypeService.list();
 
         Map<Long, String> typeNameMap = typeList.stream()
+                .filter(type -> typeIds.contains(type.getId()))
                 .collect(Collectors.toMap(ClassType::getId, ClassType::getTypeName));
 
         // 填充类型名称
