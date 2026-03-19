@@ -25,7 +25,7 @@ public class SemesterServiceImpl extends ServiceImpl<SemesterMapper, Semester> i
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    @CacheEvict(allEntries = true)
+    @CacheEvict(cacheNames = {"semester", "dashboard", "feeSummary"}, allEntries = true)
     public void setCurrent(Long id) {
         Semester target = getById(id);
         if (target == null) {
@@ -66,19 +66,19 @@ public class SemesterServiceImpl extends ServiceImpl<SemesterMapper, Semester> i
     }
 
     @Override
-    @CacheEvict(allEntries = true)
+    @CacheEvict(cacheNames = {"semester", "dashboard", "feeSummary"}, allEntries = true)
     public boolean save(Semester entity) {
         return super.save(entity);
     }
 
     @Override
-    @CacheEvict(allEntries = true)
+    @CacheEvict(cacheNames = {"semester", "dashboard", "feeSummary"}, allEntries = true)
     public boolean updateById(Semester entity) {
         return super.updateById(entity);
     }
 
     @Override
-    @CacheEvict(allEntries = true)
+    @CacheEvict(cacheNames = {"semester", "dashboard", "feeSummary"}, allEntries = true)
     public boolean removeById(Serializable id) {
         return super.removeById(id);
     }

@@ -8,9 +8,11 @@ import com.kindergarten.system.dto.PaymentPageQuery;
 import com.kindergarten.system.entity.PaymentRecord;
 import com.kindergarten.system.mapper.PaymentRecordMapper;
 import com.kindergarten.system.service.PaymentRecordService;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.io.Serializable;
 
 /**
  * 缴费记录服务实现类
@@ -18,6 +20,24 @@ import java.util.List;
 @Service
 public class PaymentRecordServiceImpl extends ServiceImpl<PaymentRecordMapper, PaymentRecord>
         implements PaymentRecordService {
+
+    @Override
+    @CacheEvict(cacheNames = {"dashboard", "feeSummary"}, allEntries = true)
+    public boolean save(PaymentRecord entity) {
+        return super.save(entity);
+    }
+
+    @Override
+    @CacheEvict(cacheNames = {"dashboard", "feeSummary"}, allEntries = true)
+    public boolean updateById(PaymentRecord entity) {
+        return super.updateById(entity);
+    }
+
+    @Override
+    @CacheEvict(cacheNames = {"dashboard", "feeSummary"}, allEntries = true)
+    public boolean removeById(Serializable id) {
+        return super.removeById(id);
+    }
 
     @Override
     public IPage<PaymentRecord> pagePayments(PaymentPageQuery query) {
@@ -32,6 +52,7 @@ public class PaymentRecordServiceImpl extends ServiceImpl<PaymentRecordMapper, P
     }
 
     @Override
+    @CacheEvict(cacheNames = {"dashboard", "feeSummary"}, allEntries = true)
     public void batchUpdateReceiptStatus(List<Long> ids, Integer status) {
         if (ids == null || ids.isEmpty()) {
             return;

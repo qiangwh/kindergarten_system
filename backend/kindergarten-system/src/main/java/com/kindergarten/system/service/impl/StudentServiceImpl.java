@@ -22,11 +22,13 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.Serializable;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -48,6 +50,7 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
     }
 
     @Override
+    @CacheEvict(cacheNames = {"dashboard", "feeSummary"}, allEntries = true)
     public boolean save(Student student) {
         // 如果学号为空，自动生成学号
         if (student.getStudentNo() == null || student.getStudentNo().isBlank()) {
@@ -62,6 +65,7 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
     }
 
     @Override
+    @CacheEvict(cacheNames = {"dashboard", "feeSummary"}, allEntries = true)
     public boolean saveBatch(Collection<Student> entityList) {
         // 批量保存时，为没有学号的学生生成学号
         for (Student student : entityList) {
@@ -78,18 +82,19 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
     }
 
     @Override
-    public IPage<Student> pageStudents(StudentPageQuery query) {
-        if (query.getPage() == null || query.getPage() < 1) {
-            query.setPage(1L);
-        }
-        if (query.getPageSize() == null || query.getPageSize() < 1) {
-            query.setPageSize(10L);
-        }
-        Page<Student> page = new Page<>(query.getPage(), query.getPageSize());
-        return baseMapper.selectStudentPage(page, query);
+    @CacheEvict(cacheNames = {"dashboard", "feeSummary"}, allEntries = true)
+    public boolean updateById(Student entity) {
+        return super.updateById(entity);
     }
 
     @Override
+    @CacheEvict(cacheNames = {"dashboard", "feeSummary"}, allEntries = true)
+    public boolean removeById(Serializable id) {
+        return super.removeById(id);
+    }
+
+    @Override
+    @CacheEvict(cacheNames = {"dashboard", "feeSummary"}, allEntries = true)
     public void updateStatus(Long id, String status) {
         Student student = new Student();
         student.setId(id);
@@ -106,6 +111,18 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
             student.setLeaveDate(null);
         }
         updateById(student);
+    }
+
+    @Override
+    public IPage<Student> pageStudents(StudentPageQuery query) {
+        if (query.getPage() == null || query.getPage() < 1) {
+            query.setPage(1L);
+        }
+        if (query.getPageSize() == null || query.getPageSize() < 1) {
+            query.setPageSize(10L);
+        }
+        Page<Student> page = new Page<>(query.getPage(), query.getPageSize());
+        return baseMapper.selectStudentPage(page, query);
     }
 
     @Override
@@ -151,6 +168,7 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
     }
 
     @Override
+    @CacheEvict(cacheNames = {"dashboard", "feeSummary"}, allEntries = true)
     public StudentImportResult importStudents(MultipartFile file) throws IOException {
         StudentImportResult result = new StudentImportResult();
         List<Student> students = new ArrayList<>();

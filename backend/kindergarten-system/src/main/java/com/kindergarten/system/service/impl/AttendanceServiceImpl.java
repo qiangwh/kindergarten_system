@@ -16,6 +16,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -57,6 +58,7 @@ public class AttendanceServiceImpl extends ServiceImpl<AttendanceMapper, Attenda
     }
 
     @Override
+    @CacheEvict(cacheNames = "dashboard", allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public void saveBatchAttendance(AttendanceSaveRequest request) {
         LocalDate attendDate = request.getAttendDate();
@@ -107,6 +109,7 @@ public class AttendanceServiceImpl extends ServiceImpl<AttendanceMapper, Attenda
     }
 
     @Override
+    @CacheEvict(cacheNames = "dashboard", allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public void saveMultiDayAttendance(AttendanceBatchRequest request) {
         Long classId = request.getClassId();
@@ -185,6 +188,7 @@ public class AttendanceServiceImpl extends ServiceImpl<AttendanceMapper, Attenda
     }
 
     @Override
+    @CacheEvict(cacheNames = "dashboard", allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public void saveGroupAttendance(AttendanceGroupRequest request) {
         Long classId = request.getClassId();
@@ -352,6 +356,7 @@ public class AttendanceServiceImpl extends ServiceImpl<AttendanceMapper, Attenda
     }
 
     @Override
+    @CacheEvict(cacheNames = "dashboard", allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public AttendanceImportResult importFromExcel(Long classId, Long semesterId, MultipartFile file) throws IOException {
         AttendanceImportResult result = new AttendanceImportResult();

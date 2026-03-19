@@ -83,19 +83,19 @@ public class ClassInfoServiceImpl extends ServiceImpl<ClassInfoMapper, ClassInfo
     }
 
     @Override
-    @CacheEvict(allEntries = true)
+    @CacheEvict(cacheNames = {"classInfo", "dashboard", "feeSummary"}, allEntries = true)
     public boolean save(ClassInfo entity) {
         return super.save(entity);
     }
 
     @Override
-    @CacheEvict(allEntries = true)
+    @CacheEvict(cacheNames = {"classInfo", "dashboard", "feeSummary"}, allEntries = true)
     public boolean updateById(ClassInfo entity) {
         return super.updateById(entity);
     }
 
     @Override
-    @CacheEvict(allEntries = true)
+    @CacheEvict(cacheNames = {"classInfo", "dashboard", "feeSummary"}, allEntries = true)
     public boolean removeById(Serializable id) {
         return super.removeById(id);
     }

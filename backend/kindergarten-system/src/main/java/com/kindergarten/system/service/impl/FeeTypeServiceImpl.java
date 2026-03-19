@@ -43,19 +43,19 @@ public class FeeTypeServiceImpl extends ServiceImpl<FeeTypeMapper, FeeType> impl
     }
 
     @Override
-    @CacheEvict(allEntries = true)
+    @CacheEvict(cacheNames = {"feeType", "dashboard", "feeSummary"}, allEntries = true)
     public boolean save(FeeType entity) {
         return super.save(entity);
     }
 
     @Override
-    @CacheEvict(allEntries = true)
+    @CacheEvict(cacheNames = {"feeType", "dashboard", "feeSummary"}, allEntries = true)
     public boolean updateById(FeeType entity) {
         return super.updateById(entity);
     }
 
     @Override
-    @CacheEvict(allEntries = true)
+    @CacheEvict(cacheNames = {"feeType", "dashboard", "feeSummary"}, allEntries = true)
     public boolean removeById(Serializable id) {
         return super.removeById(id);
     }

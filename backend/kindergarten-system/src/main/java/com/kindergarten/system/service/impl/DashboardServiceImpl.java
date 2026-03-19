@@ -13,6 +13,9 @@ import com.kindergarten.system.mapper.*;
 import com.kindergarten.system.service.DashboardService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheConfig;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -25,6 +28,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@CacheConfig(cacheNames = "dashboard")
 @RequiredArgsConstructor
 public class DashboardServiceImpl implements DashboardService {
 
@@ -34,7 +38,13 @@ public class DashboardServiceImpl implements DashboardService {
     private final FeeSummaryMapper feeSummaryMapper;
     private final AttendanceMapper attendanceMapper;
 
+    /**
+     * 首页概览数据属于典型的“读多写少”场景，
+     * 同一个月内频繁打开首页时，直接复用缓存结果可以减少多次聚合查询。
+     * 写操作会在相关服务中统一触发失效，所以这里缓存的是整份首页快照。
+     */
     @Override
+    @Cacheable(key = "T(com.kindergarten.system.common.cache.CacheKeyUtil).key('overview', T(java.time.LocalDate).now().getYear(), T(java.time.LocalDate).now().getMonthValue())", sync = true)
     public DashboardOverview getOverview() {
         DashboardOverview overview = new DashboardOverview();
 
@@ -54,7 +64,10 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     /**
-     * 加载学生统计
+     * 加载学生统计。
+     * <p>
+     * 这一块同时用于首页人数展示和班级分布展示，数据变化通常来自学生新增、编辑、导入或状态变更。
+     * </p>
      */
     private void loadStudentStats(DashboardOverview overview) {
         // 在读学生总数
@@ -73,7 +86,10 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     /**
-     * 加载当前学期
+     * 加载当前学期。
+     * <p>
+     * 当前学期切换后会由学期服务统一清空 dashboard / feeSummary 缓存。
+     * </p>
      */
     private void loadCurrentSemester(DashboardOverview overview) {
         Semester current = semesterMapper.selectOne(
@@ -92,7 +108,10 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     /**
-     * 加载收费统计
+     * 加载收费统计。
+     * <p>
+     * 这里依赖当前学期，缓存命中后可以避免重复执行收费汇总查询。
+     * </p>
      */
     private void loadFeeStats(DashboardOverview overview) {
         if (overview.getCurrentSemester() == null) {
@@ -123,7 +142,10 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     /**
-     * 加载考勤统计（本月）
+     * 加载考勤统计（本月）。
+     * <p>
+     * 由于首页默认展示当月数据，所以缓存 key 额外按“年-月”区分，跨月自动生成新缓存。
+     * </p>
      */
     private void loadAttendanceStats(DashboardOverview overview) {
         LocalDate now = LocalDate.now();
