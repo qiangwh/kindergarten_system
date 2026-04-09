@@ -120,6 +120,8 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
         }
         if (query.getPageSize() == null || query.getPageSize() < 1) {
             query.setPageSize(10L);
+        } else if (query.getPageSize() > 200) {
+            query.setPageSize(200L);
         }
         Page<Student> page = new Page<>(query.getPage(), query.getPageSize());
         return baseMapper.selectStudentPage(page, query);

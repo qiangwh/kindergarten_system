@@ -1,12 +1,11 @@
 spring:
   profiles:
-    active: dev
+    active: dev,local
   application:
     name: kindergarten-system
 
 mybatis-plus:
   configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
     map-underscore-to-camel-case: true
   global-config:
     db-config:
@@ -22,7 +21,8 @@ server:
     context-path: /api
 
 jwt:
-  # 至少 32 字节，生产环境请使用环境变量覆盖
-  secret: kindergarten-system-secret-key-2024-very-long-secret
-  expiration: 86400000
+  # 密钥通过 application-local.yml 或环境变量提供
+  secret: ${JWT_SECRET:please-set-jwt-secret-in-local-yml}
+  # 2小时过期（7200000毫秒）
+  expiration: ${JWT_EXPIRATION:7200000}
   issuer: kindergarten-system

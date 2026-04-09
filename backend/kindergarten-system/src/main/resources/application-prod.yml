@@ -8,20 +8,16 @@ spring:
       maximum-pool-size: 20
       minimum-idle: 10
 
-jwt:
-  secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION:86400000}
-
 logging:
   level:
     com.kindergarten: INFO
     root: WARN
 
 r2:
-  endpoint: ${R2_ENDPOINT:https://671babae1419e629ec67972966abdd31.r2.cloudflarestorage.com}
-  access-key: ${R2_ACCESS_KEY:c1bfe2c1873ce059ff6883461ac35d32}
-  secret-key: ${R2_SECRET_KEY:942cb8d58a9e2a5178ac2ec351d3f368f15fb3d50ba069e81bd7810471a12c8b}
-  bucket: ${R2_BUCKET:54320}
-  public-url: ${R2_PUBLIC_URL:https://xiaow.de5.net}
+  endpoint: ${R2_ENDPOINT}
+  access-key: ${R2_ACCESS_KEY}
+  secret-key: ${R2_SECRET_KEY}
+  bucket: ${R2_BUCKET}
+  public-url: ${R2_PUBLIC_URL}
   region: ${R2_REGION:auto}
   max-file-size-mb: ${R2_MAX_FILE_SIZE_MB:10}

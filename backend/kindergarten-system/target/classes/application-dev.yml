@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:mysql://gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/kindergarten_db?useSSL=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8
-    username: 3mcMwRB23dAMJm4.root
-    password: BZ4PAk7qooINOiAE
+    url: ${DB_URL:jdbc:mysql://localhost:3306/kindergarten_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 10
@@ -11,9 +11,9 @@ spring:
       idle-timeout: 600000
       max-lifetime: 1800000
 
-jwt:
-  secret: kindergarten-system-secret-key-2026
-  expiration: 86400000
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
 logging:
   level:
@@ -21,10 +21,10 @@ logging:
     org.springframework.security: DEBUG
 
 r2:
-  endpoint: ${R2_ENDPOINT:https://671babae1419e629ec67972966abdd31.r2.cloudflarestorage.com}
-  access-key: ${R2_ACCESS_KEY:c1bfe2c1873ce059ff6883461ac35d32}
-  secret-key: ${R2_SECRET_KEY:942cb8d58a9e2a5178ac2ec351d3f368f15fb3d50ba069e81bd7810471a12c8b}
-  bucket: ${R2_BUCKET:54320}
-  public-url: ${R2_PUBLIC_URL:https://xiaow.de5.net}
+  endpoint: ${R2_ENDPOINT}
+  access-key: ${R2_ACCESS_KEY}
+  secret-key: ${R2_SECRET_KEY}
+  bucket: ${R2_BUCKET}
+  public-url: ${R2_PUBLIC_URL}
   region: ${R2_REGION:auto}
   max-file-size-mb: ${R2_MAX_FILE_SIZE_MB:10}
