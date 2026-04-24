@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -33,10 +34,19 @@ public class GlobalExceptionHandler {
         return Result.error(ResultCode.UNAUTHORIZED.getCode(), "账号已禁用");
     }
 
+    @ExceptionHandler(InternalAuthenticationServiceException.class)
+    public Result<Void> handleInternalAuthenticationServiceException(InternalAuthenticationServiceException e) {
+        // 数据库连接异常等内部错误导致认证失败
+        Throwable cause = e.getCause();
+        String msg = cause != null ? cause.getMessage() : e.getMessage();
+        log.error("认证服务内部异常: {}", msg, e);
+        return Result.error(ResultCode.SYSTEM_ERROR.getCode(), "系统服务暂时不可用，请稍后重试");
+    }
+
     @ExceptionHandler(AuthenticationException.class)
     public Result<Void> handleAuthenticationException(AuthenticationException e) {
         log.warn("认证异常: {}", e.getMessage());
-        return Result.error(ResultCode.UNAUTHORIZED);
+        return Result.error(ResultCode.UNAUTHORIZED.getCode(), e.getMessage() != null ? e.getMessage() : "认证失败");
     }
 
     @ExceptionHandler(AccessDeniedException.class)
