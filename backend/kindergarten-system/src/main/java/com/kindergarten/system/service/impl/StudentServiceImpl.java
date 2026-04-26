@@ -50,7 +50,7 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
     }
 
     @Override
-    @CacheEvict(cacheNames = {"dashboard", "feeSummary"}, allEntries = true)
+    @CacheEvict(cacheNames = {"dashboard", "feeSummary", "classInfo"}, allEntries = true)
     public boolean save(Student student) {
         // 如果学号为空，自动生成学号
         if (student.getStudentNo() == null || student.getStudentNo().isBlank()) {
@@ -65,7 +65,7 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
     }
 
     @Override
-    @CacheEvict(cacheNames = {"dashboard", "feeSummary"}, allEntries = true)
+    @CacheEvict(cacheNames = {"dashboard", "feeSummary", "classInfo"}, allEntries = true)
     public boolean saveBatch(Collection<Student> entityList) {
         // 批量保存时，为没有学号的学生生成学号
         for (Student student : entityList) {
@@ -82,19 +82,19 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
     }
 
     @Override
-    @CacheEvict(cacheNames = {"dashboard", "feeSummary"}, allEntries = true)
+    @CacheEvict(cacheNames = {"dashboard", "feeSummary", "classInfo"}, allEntries = true)
     public boolean updateById(Student entity) {
         return super.updateById(entity);
     }
 
     @Override
-    @CacheEvict(cacheNames = {"dashboard", "feeSummary"}, allEntries = true)
+    @CacheEvict(cacheNames = {"dashboard", "feeSummary", "classInfo"}, allEntries = true)
     public boolean removeById(Serializable id) {
         return super.removeById(id);
     }
 
     @Override
-    @CacheEvict(cacheNames = {"dashboard", "feeSummary"}, allEntries = true)
+    @CacheEvict(cacheNames = {"dashboard", "feeSummary", "classInfo"}, allEntries = true)
     public void updateStatus(Long id, String status) {
         Student student = new Student();
         student.setId(id);

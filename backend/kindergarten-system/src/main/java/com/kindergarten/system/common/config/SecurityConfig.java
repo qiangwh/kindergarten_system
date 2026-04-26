@@ -123,7 +123,7 @@ public class SecurityConfig {
                 "https://kindergarten-system-ui.pages.dev",
                 "https://xiaow.cc.cd",
                 "http://localhost:8080",
-                "http://localhost:5173"
+                "http://localhost:3000"
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));

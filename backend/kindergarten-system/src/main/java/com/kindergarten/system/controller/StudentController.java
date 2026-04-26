@@ -14,7 +14,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
-import java.time.LocalDate;
 import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -124,7 +123,9 @@ public class StudentController {
     }
 
     /**
-     * 删除学生（软删除，将状态置为 inactive）
+     * 删除学生（软删除，将状态置为 deleted）
+     *
+     * <p>与"离园"不同，删除会将状态标记为 deleted，查询列表时自动过滤。</p>
      *
      * @param id 学生ID
      * @return 操作结果
@@ -133,11 +134,7 @@ public class StudentController {
     public Result<Void> delete(@PathVariable Long id) {
         Student student = studentService.getById(id);
         if (student != null) {
-            student.setStatus("inactive");
-            // 设置离园日期为今天
-            if (student.getLeaveDate() == null) {
-                student.setLeaveDate(LocalDate.now());
-            }
+            student.setStatus("deleted");
             studentService.updateById(student);
         }
         return Result.success();

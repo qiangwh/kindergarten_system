@@ -10,9 +10,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.kindergarten.system.dto.DashboardOverview;
 import com.kindergarten.system.entity.ClassInfo;
 import com.kindergarten.system.entity.ClassType;
 import com.kindergarten.system.mapper.ClassInfoMapper;
+import com.kindergarten.system.mapper.StudentMapper;
 import com.kindergarten.system.service.ClassInfoService;
 import com.kindergarten.system.service.ClassTypeService;
 import com.kindergarten.system.common.cache.CacheKeyUtil;
@@ -35,6 +37,9 @@ public class ClassInfoServiceImpl extends ServiceImpl<ClassInfoMapper, ClassInfo
     /** 班级类型服务 */
     private final ClassTypeService classTypeService;
 
+    /** 学生 Mapper（用于实时统计班级学生数） */
+    private final StudentMapper studentMapper;
+
     @Override
     @Cacheable(key = "'enabled'")
     public List<ClassInfo> listEnabled() {
@@ -44,8 +49,9 @@ public class ClassInfoServiceImpl extends ServiceImpl<ClassInfoMapper, ClassInfo
                 .orderByDesc(ClassInfo::getGradeYear)
                 .orderByAsc(ClassInfo::getId));
 
-        // 填充班级类型名称
+        // 填充班级类型名称和学生人数
         fillClassTypeName(classList);
+        fillStudentCount(classList);
 
         return classList;
     }
@@ -60,6 +66,7 @@ public class ClassInfoServiceImpl extends ServiceImpl<ClassInfoMapper, ClassInfo
                 .orderByAsc(ClassInfo::getId));
 
         fillClassTypeName(classList);
+        fillStudentCount(classList);
 
         return classList;
     }
@@ -79,6 +86,7 @@ public class ClassInfoServiceImpl extends ServiceImpl<ClassInfoMapper, ClassInfo
                 .orderByAsc(ClassInfo::getId));
 
         fillClassTypeName(result.getRecords());
+        fillStudentCount(result.getRecords());
         return result;
     }
 
@@ -126,6 +134,34 @@ public class ClassInfoServiceImpl extends ServiceImpl<ClassInfoMapper, ClassInfo
         // 填充类型名称
         classList.forEach(classInfo -> {
             classInfo.setClassTypeName(typeNameMap.get(classInfo.getClassTypeId()));
+        });
+    }
+
+    /**
+     * 实时填充班级的在读学生人数
+     *
+     * @param classList 班级列表
+     */
+    private void fillStudentCount(List<ClassInfo> classList) {
+        if (classList.isEmpty()) {
+            return;
+        }
+
+        // 通过已有的 SQL 查询各班级在读学生数
+        List<DashboardOverview.ClassStudentCount> counts = studentMapper.selectActiveStudentCountsByClass();
+
+        // 构建 classId -> count 映射
+        Map<Long, Long> countMap = counts.stream()
+                .collect(Collectors.toMap(
+                        DashboardOverview.ClassStudentCount::getClassId,
+                        DashboardOverview.ClassStudentCount::getCount,
+                        (a, b) -> a
+                ));
+
+        // 填充到班级对象中
+        classList.forEach(classInfo -> {
+            Long count = countMap.get(classInfo.getId());
+            classInfo.setCurrentCount(count != null ? count.intValue() : 0);
         });
     }
 

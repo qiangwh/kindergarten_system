@@ -9,6 +9,7 @@
         FROM student s
         LEFT JOIN class_info c ON s.class_id = c.id
         <where>
+            AND s.status != 'deleted'
             <if test="query.name != null and query.name != ''">
                 AND s.name LIKE CONCAT('%', #{query.name}, '%')
             </if>
@@ -27,6 +28,7 @@
         FROM student s
         LEFT JOIN class_info c ON s.class_id = c.id
         <where>
+            AND s.status != 'deleted'
             <if test="query.name != null and query.name != ''">
                 AND s.name LIKE CONCAT('%', #{query.name}, '%')
             </if>
