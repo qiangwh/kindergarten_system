@@ -138,3 +138,6 @@ backend/kindergarten-system/
 │       ├── application-dev.yml               # 开发环境（已配置 TiDB）
 │       ├── application-prod.yml              # 生产环境
 │       └── db/schema.sql                     # 数据库初始化脚本
+## License
+
+This project is licensed under the [MIT License](./LICENSE).
